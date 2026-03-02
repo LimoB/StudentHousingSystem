@@ -1,0 +1,11 @@
+# Ignore node_modules in backend and frontend
+Backend/node_modules/
+housing-frontend/node_modules/
+
+# Ignore environment files
+Backend/.env
+housing-frontend/.env
+
+# Optional: ignore build outputs
+Backend/dist/
+housing-frontend/dist/
