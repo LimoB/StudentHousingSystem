@@ -2,7 +2,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
   getProperties,
-//   getPropertyById,
   createProperty,
   updateProperty,
   deleteProperty,
