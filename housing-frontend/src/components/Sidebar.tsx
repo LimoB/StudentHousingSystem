@@ -1,41 +1,54 @@
-// import React from "react";
-import { Link } from "react-router-dom";
+// src/components/Sidebar.tsx
+import { Link, useLocation } from "react-router-dom";
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  role: "student" | "landlord" | "admin";
+}
+
+const Sidebar = ({ role }: SidebarProps) => {
+  const location = useLocation();
+
+  // Define menu items per role
+  const menus = {
+    student: [
+      { title: "Dashboard", path: "/dashboard/student" },
+      { title: "Bookings", path: "/bookings" },
+      { title: "Leases", path: "/leases" },
+      { title: "Payments", path: "/payments" },
+      { title: "Maintenance", path: "/maintenance" },
+    ],
+    landlord: [
+      { title: "Dashboard", path: "/dashboard/landlord" },
+      { title: "Properties", path: "/properties" },
+      { title: "Units", path: "/units" },
+      { title: "Leases", path: "/leases" },
+      { title: "Maintenance", path: "/maintenance" },
+    ],
+    admin: [
+      { title: "Dashboard", path: "/dashboard/admin" },
+      { title: "Users", path: "/users" },
+      { title: "Properties", path: "/properties" },
+      { title: "Bookings", path: "/bookings" },
+      { title: "Reports", path: "/reports" },
+    ],
+  };
+
   return (
-    <aside className="w-64 bg-gray-900 text-white min-h-screen p-6">
-      <h2 className="text-2xl font-bold mb-6">Housing</h2>
+    <aside className="w-64 bg-white shadow-md flex-shrink-0">
+      <div className="p-6 font-bold text-xl border-b">Housing System</div>
 
-      <nav className="flex flex-col gap-4">
-
-        <Link to="/dashboard" className="hover:text-gray-300">
-          Dashboard
-        </Link>
-
-        <Link to="/bookings" className="hover:text-gray-300">
-          Bookings
-        </Link>
-
-        <Link to="/leases" className="hover:text-gray-300">
-          Leases
-        </Link>
-
-        <Link to="/maintenance" className="hover:text-gray-300">
-          Maintenance
-        </Link>
-
-        <Link to="/payments" className="hover:text-gray-300">
-          Payments
-        </Link>
-
-        <Link to="/properties" className="hover:text-gray-300">
-          Properties
-        </Link>
-
-        <Link to="/units" className="hover:text-gray-300">
-          Units
-        </Link>
-
+      <nav className="mt-4 flex flex-col">
+        {menus[role].map((menu) => (
+          <Link
+            key={menu.title}
+            to={menu.path}
+            className={`px-6 py-3 hover:bg-gray-100 ${
+              location.pathname.startsWith(menu.path) ? "bg-gray-200 font-semibold" : ""
+            }`}
+          >
+            {menu.title}
+          </Link>
+        ))}
       </nav>
     </aside>
   );
