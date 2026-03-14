@@ -2,22 +2,26 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
   getBookings,
   getMyBookings,
+  getBookingById,
   createBooking,
   deleteBooking,
 } from "../../api/bookings";
+import type { Booking, CreateBookingPayload } from "../../api/bookings";
 
 /* =========================
    STATE
 ========================= */
 
 interface BookingState {
-  bookings: any[];
+  bookings: Booking[];
+  selectedBooking: Booking | null;
   loading: boolean;
   error: string | null;
 }
 
 const initialState: BookingState = {
   bookings: [],
+  selectedBooking: null,
   loading: false,
   error: null,
 };
@@ -26,16 +30,22 @@ const initialState: BookingState = {
    THUNKS
 ========================= */
 
+/* GET ALL BOOKINGS */
+
 export const fetchBookings = createAsyncThunk(
   "bookings/fetchBookings",
   async (_, thunkAPI) => {
     try {
       return await getBookings();
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(
+        error?.response?.data?.message || "Failed to fetch bookings"
+      );
     }
   }
 );
+
+/* GET MY BOOKINGS */
 
 export const fetchMyBookings = createAsyncThunk(
   "bookings/fetchMyBookings",
@@ -43,21 +53,44 @@ export const fetchMyBookings = createAsyncThunk(
     try {
       return await getMyBookings();
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(
+        error?.response?.data?.message || "Failed to fetch my bookings"
+      );
     }
   }
 );
 
-export const createBookingAction = createAsyncThunk(
-  "bookings/createBooking",
-  async (payload: any, thunkAPI) => {
+/* GET BOOKING BY ID */
+
+export const fetchBookingById = createAsyncThunk(
+  "bookings/fetchBookingById",
+  async (id: number, thunkAPI) => {
     try {
-      return await createBooking(payload);
+      return await getBookingById(id);
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(
+        error?.response?.data?.message || "Failed to fetch booking"
+      );
     }
   }
 );
+
+/* CREATE BOOKING */
+
+export const createBookingAction = createAsyncThunk(
+  "bookings/createBooking",
+  async (payload: CreateBookingPayload, thunkAPI) => {
+    try {
+      return await createBooking(payload);
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(
+        error?.response?.data?.message || "Failed to create booking"
+      );
+    }
+  }
+);
+
+/* DELETE BOOKING */
 
 export const deleteBookingAction = createAsyncThunk(
   "bookings/deleteBooking",
@@ -66,7 +99,9 @@ export const deleteBookingAction = createAsyncThunk(
       await deleteBooking(id);
       return id;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(
+        error?.response?.data?.message || "Failed to delete booking"
+      );
     }
   }
 );
@@ -87,6 +122,7 @@ const bookingSlice = createSlice({
 
       .addCase(fetchBookings.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
 
       .addCase(fetchBookings.fulfilled, (state, action) => {
@@ -101,14 +137,42 @@ const bookingSlice = createSlice({
 
       /* FETCH MY BOOKINGS */
 
+      .addCase(fetchMyBookings.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+
       .addCase(fetchMyBookings.fulfilled, (state, action) => {
+        state.loading = false;
         state.bookings = action.payload;
+      })
+
+      .addCase(fetchMyBookings.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+
+      /* FETCH BOOKING BY ID */
+
+      .addCase(fetchBookingById.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+
+      .addCase(fetchBookingById.fulfilled, (state, action) => {
+        state.loading = false;
+        state.selectedBooking = action.payload;
+      })
+
+      .addCase(fetchBookingById.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       })
 
       /* CREATE BOOKING */
 
       .addCase(createBookingAction.fulfilled, (state, action) => {
-        state.bookings.push(action.payload.booking);
+        state.bookings.push(action.payload);
       })
 
       /* DELETE BOOKING */
