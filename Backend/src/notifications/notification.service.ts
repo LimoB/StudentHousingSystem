@@ -1,30 +1,37 @@
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import db from "../drizzle/db";
 import { notifications } from "../drizzle/schema";
 
 export type TNotificationInsert = typeof notifications.$inferInsert;
-export type TNotificationSelect = typeof notifications.$inferSelect;
 
 /* ================================
-   GET ALL NOTIFICATIONS
+   GET ALL NOTIFICATIONS (With Relations)
 ================================ */
-export const getNotificationsService = async (): Promise<TNotificationSelect[]> => {
-  return await db.query.notifications.findMany();
+export const getNotificationsService = async () => {
+  return await db.query.notifications.findMany({
+    with: {
+      user: {
+        columns: { fullName: true, email: true }
+      }
+    },
+    orderBy: [desc(notifications.createdAt)]
+  });
 };
 
 /* ================================
-   GET USER NOTIFICATIONS
+   GET USER NOTIFICATIONS (Newest First)
 ================================ */
-export const getUserNotificationsService = async (userId: number): Promise<TNotificationSelect[]> => {
+export const getUserNotificationsService = async (userId: number) => {
   return await db.query.notifications.findMany({
     where: eq(notifications.userId, userId),
+    orderBy: [desc(notifications.createdAt)]
   });
 };
 
 /* ================================
    CREATE NOTIFICATION
 ================================ */
-export const createNotificationService = async (notification: TNotificationInsert): Promise<TNotificationSelect> => {
+export const createNotificationService = async (notification: TNotificationInsert) => {
   const result = await db.insert(notifications).values(notification).returning();
   return result[0];
 };
@@ -32,7 +39,7 @@ export const createNotificationService = async (notification: TNotificationInser
 /* ================================
    MARK AS READ
 ================================ */
-export const markAsReadService = async (notificationId: number): Promise<string> => {
+export const markAsReadService = async (notificationId: number) => {
   const result = await db
     .update(notifications)
     .set({ isRead: true })
@@ -40,18 +47,13 @@ export const markAsReadService = async (notificationId: number): Promise<string>
     .returning();
 
   if (!result.length) throw new Error("Notification not found");
-
   return "Notification marked as read";
 };
 
 /* ================================
    DELETE NOTIFICATION
 ================================ */
-export const deleteNotificationService = async (notificationId: number): Promise<boolean> => {
-  const result = await db
-    .delete(notifications)
-    .where(eq(notifications.id, notificationId))
-    .returning();
-
+export const deleteNotificationService = async (notificationId: number) => {
+  const result = await db.delete(notifications).where(eq(notifications.id, notificationId)).returning();
   return result.length > 0;
 };
