@@ -9,6 +9,8 @@ import {
   Property,
   CreatePropertyPayload,
 } from "../../api/properties";
+// Import unit actions to listen for changes
+import { createUnitAction, deleteUnitAction, updateUnitAction } from "./unitSlice";
 
 /* =========================
    STATE
@@ -31,105 +33,77 @@ const initialState: PropertyState = {
    THUNKS
 ========================= */
 
-// Fetch all properties
+// Fetch all properties (includes nested units from our relational backend)
 export const fetchProperties = createAsyncThunk<
   Property[],
   void,
   { rejectValue: string }
 >("properties/fetchAll", async (_, thunkAPI) => {
-  const token = localStorage.getItem("token");
-  if (!token) return thunkAPI.rejectWithValue("No auth token, please login");
-
   try {
     const result = await getProperties();
-    console.log("✅ Fetched all properties:", result.length);
+    console.log("✅ Fetched all properties with units:", result.length);
     return result;
   } catch (error: any) {
-    console.error("❌ Failed to fetch properties:", error.message);
     return thunkAPI.rejectWithValue(
       error.response?.data?.message || "Failed to fetch properties"
     );
   }
 });
 
-// Fetch property by ID
 export const fetchPropertyById = createAsyncThunk<
   Property,
   number,
   { rejectValue: string }
 >("properties/fetchById", async (id, thunkAPI) => {
-  const token = localStorage.getItem("token");
-  if (!token) return thunkAPI.rejectWithValue("No auth token, please login");
-
   try {
     const result = await getPropertyById(id);
-    console.log("✅ Fetched property by ID:", result);
     return result;
   } catch (error: any) {
-    console.error("❌ Failed to fetch property:", error.message);
     return thunkAPI.rejectWithValue(
       error.response?.data?.message || "Failed to fetch property"
     );
   }
 });
 
-// Create property
 export const createPropertyAction = createAsyncThunk<
   Property,
   CreatePropertyPayload,
   { rejectValue: string }
 >("properties/create", async (payload, thunkAPI) => {
-  const token = localStorage.getItem("token");
-  if (!token) return thunkAPI.rejectWithValue("No auth token, please login");
-
   try {
     const result = await createProperty(payload);
-    console.log("✅ Created property:", result);
     return result;
   } catch (error: any) {
-    console.error("❌ Failed to create property:", error.message);
     return thunkAPI.rejectWithValue(
       error.response?.data?.message || "Failed to create property"
     );
   }
 });
 
-// Update property
 export const updatePropertyAction = createAsyncThunk<
   Property,
   { id: number; data: Partial<CreatePropertyPayload> },
   { rejectValue: string }
 >("properties/update", async ({ id, data }, thunkAPI) => {
-  const token = localStorage.getItem("token");
-  if (!token) return thunkAPI.rejectWithValue("No auth token, please login");
-
   try {
     const result = await updateProperty(id, data);
-    console.log("✅ Updated property:", result);
     return result;
   } catch (error: any) {
-    console.error("❌ Failed to update property:", error.message);
     return thunkAPI.rejectWithValue(
       error.response?.data?.message || "Failed to update property"
     );
   }
 });
 
-// Delete property
 export const deletePropertyAction = createAsyncThunk<
   number,
   number,
   { rejectValue: string }
 >("properties/delete", async (id, thunkAPI) => {
-  const token = localStorage.getItem("token");
-  if (!token) return thunkAPI.rejectWithValue("No auth token, please login");
-
   try {
     await deleteProperty(id);
-    console.log("✅ Deleted property:", id);
     return id;
   } catch (error: any) {
-    console.error("❌ Failed to delete property:", error.message);
     return thunkAPI.rejectWithValue(
       error.response?.data?.message || "Failed to delete property"
     );
@@ -145,7 +119,7 @@ const propertySlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      // FETCH ALL
+      /* --- FETCH ALL --- */
       .addCase(fetchProperties.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -159,30 +133,17 @@ const propertySlice = createSlice({
         state.error = action.payload || "Failed to fetch properties";
       })
 
-      // FETCH BY ID
-      .addCase(fetchPropertyById.pending, (state) => {
-        state.loading = true;
-        state.selectedProperty = null;
-        state.error = null;
-      })
+      /* --- FETCH BY ID --- */
       .addCase(fetchPropertyById.fulfilled, (state, action) => {
-        state.loading = false;
         state.selectedProperty = action.payload;
       })
-      .addCase(fetchPropertyById.rejected, (state, action) => {
-        state.loading = false;
-        state.selectedProperty = null;
-        state.error = action.payload || "Failed to fetch property";
-      })
 
-      // CREATE
+      /* --- CREATE PROPERTY --- */
       .addCase(createPropertyAction.fulfilled, (state, action) => {
-        if (action.payload) {
-          state.properties.push(action.payload);
-        }
+        state.properties.push({ ...action.payload, units: [] });
       })
 
-      // UPDATE
+      /* --- UPDATE PROPERTY --- */
       .addCase(updatePropertyAction.fulfilled, (state, action) => {
         const updated = action.payload;
         state.properties = state.properties.map((p) =>
@@ -190,11 +151,43 @@ const propertySlice = createSlice({
         );
       })
 
-      // DELETE
+      /* --- DELETE PROPERTY --- */
       .addCase(deletePropertyAction.fulfilled, (state, action) => {
-        state.properties = state.properties.filter(
-          (p) => p.id !== action.payload
-        );
+        state.properties = state.properties.filter((p) => p.id !== action.payload);
+      })
+
+      /* ========================================================
+         CROSS-SLICE LISTENERS (Reacting to Unit Changes)
+      ======================================================== */
+
+      // 1. When a NEW UNIT is created, add it to the correct property group
+      .addCase(createUnitAction.fulfilled, (state, action) => {
+        const newUnit = action.payload.unit || action.payload;
+        const parentProperty = state.properties.find(p => p.id === newUnit.propertyId);
+        if (parentProperty) {
+          if (!parentProperty.units) parentProperty.units = [];
+          parentProperty.units.push(newUnit);
+        }
+      })
+
+      // 2. When a UNIT is updated (e.g., status changed), update it inside the property
+      .addCase(updateUnitAction.fulfilled, (state, action) => {
+        const updatedUnit = action.payload.unit || action.payload;
+        state.properties.forEach(p => {
+          if (p.units) {
+            p.units = p.units.map(u => u.id === updatedUnit.id ? updatedUnit : u);
+          }
+        });
+      })
+
+      // 3. When a UNIT is deleted, remove it from its property group
+      .addCase(deleteUnitAction.fulfilled, (state, action) => {
+        const deletedUnitId = action.payload;
+        state.properties.forEach(p => {
+          if (p.units) {
+            p.units = p.units.filter(u => u.id !== deletedUnitId);
+          }
+        });
       });
   },
 });

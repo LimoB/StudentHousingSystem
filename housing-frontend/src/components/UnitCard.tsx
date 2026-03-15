@@ -1,108 +1,85 @@
-import { useState } from "react";
-import { useDispatch } from "react-redux";
-import { Unit } from "../api/units";
-import { AppDispatch } from "../app/store";
-import { updateUnitAction, deleteUnitAction } from "../app/slices/unitSlice";
+// src/components/UnitCard.tsx
+import { HiOutlineTrash, HiOutlinePencilSquare, HiOutlineScale, HiOutlineCalendarDays } from "react-icons/hi2";
+import { useDispatch } from 'react-redux';
+import { deleteUnitAction } from '../app/slices/unitSlice';
+import { AppDispatch } from '../app/store';
+import toast from "react-hot-toast"; // Added toast
 
 interface UnitCardProps {
-  unit: Unit;
+  unit: any;
 }
 
 const UnitCard: React.FC<UnitCardProps> = ({ unit }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const [isEditing, setIsEditing] = useState(false);
-  const [name, setName] = useState(unit.name);
-  const [size, setSize] = useState(unit.size);
-  const [status, setStatus] = useState(unit.status);
 
-  const handleUpdate = async () => {
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete unit ${unit.unitNumber || unit.name}?`)) return;
+
+    const loadingToast = toast.loading("Deleting unit...");
+
     try {
-      await dispatch(
-        updateUnitAction({ id: unit.id, data: { name, size, status } })
-      ).unwrap();
-      setIsEditing(false);
-    } catch (err: any) {
-      alert(err || "Failed to update unit");
+      const result = await dispatch(deleteUnitAction(unit.id));
+      if (deleteUnitAction.fulfilled.match(result)) {
+        toast.success("Unit removed", { id: loadingToast });
+      } else {
+        toast.error("Failed to remove unit", { id: loadingToast });
+      }
+    } catch (err) {
+      toast.error("An error occurred", { id: loadingToast });
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this unit?")) return;
-    try {
-      await dispatch(deleteUnitAction(unit.id)).unwrap();
-    } catch (err: any) {
-      alert(err || "Failed to delete unit");
-    }
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? "N/A" : date.toLocaleDateString('en-GB');
   };
 
   return (
-    <div className="border rounded-lg p-4 shadow hover:shadow-lg transition-shadow">
-      {isEditing ? (
-        <div className="space-y-2">
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full border p-1 rounded"
-          />
-          <input
-            type="text"
-            value={size}
-            onChange={(e) => setSize(e.target.value)}
-            className="w-full border p-1 rounded"
-          />
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="w-full border p-1 rounded"
-          >
-            <option value="available">Available</option>
-            <option value="occupied">Occupied</option>
-            <option value="maintenance">Maintenance</option>
-          </select>
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={handleUpdate}
-              className="bg-blue-600 text-white px-3 py-1 rounded"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => setIsEditing(false)}
-              className="bg-gray-400 text-white px-3 py-1 rounded"
-            >
-              Cancel
-            </button>
+    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-blue-50/50 transition-all duration-300 p-6 flex flex-col justify-between">
+      <div>
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h4 className="text-xl font-black text-gray-900">Room {unit.unitNumber || unit.name}</h4>
+            <p className="text-blue-600 font-bold">
+              Ksh {Number(unit.price || 0).toLocaleString()}
+              <span className="text-xs text-gray-400 font-normal"> /mo</span>
+            </p>
+          </div>
+          <span className={`px-3 py-1 text-[10px] font-black rounded-lg uppercase tracking-wider ${
+            unit.isAvailable || unit.status === 'available' 
+              ? "bg-green-50 text-green-600 border border-green-100" 
+              : "bg-red-50 text-red-600 border border-red-100"
+          }`}>
+            {unit.isAvailable || unit.status === 'available' ? "Available" : "Occupied"}
+          </span>
+        </div>
+
+        <div className="space-y-3 mt-4">
+          <div className="flex items-center text-sm text-gray-500 font-medium">
+            <HiOutlineScale className="mr-2 text-gray-400 w-4 h-4" />
+            <span className="text-gray-400 mr-1">Size:</span> 
+            <span className="text-gray-900">{unit.size || "Standard Room"}</span>
+          </div>
+          <div className="flex items-center text-sm text-gray-500 font-medium">
+            <HiOutlineCalendarDays className="mr-2 text-gray-400 w-4 h-4" />
+            <span className="text-gray-400 mr-1">Listed:</span> 
+            <span className="text-gray-900">{formatDate(unit.createdAt)}</span>
           </div>
         </div>
-      ) : (
-        <>
-          <h2 className="text-lg font-semibold">{unit.name}</h2>
-          <p><strong>Property ID:</strong> {unit.propertyId}</p>
-          <p><strong>Size:</strong> {unit.size}</p>
-          <p><strong>Status:</strong> {unit.status}</p>
-          <p className="text-sm text-gray-500">
-            Created: {new Date(unit.createdAt).toLocaleDateString()}
-          </p>
-          <p className="text-sm text-gray-500">
-            Updated: {new Date(unit.updatedAt).toLocaleDateString()}
-          </p>
-          <div className="flex gap-2 mt-2">
-            <button
-              onClick={() => setIsEditing(true)}
-              className="bg-yellow-500 text-white px-3 py-1 rounded"
-            >
-              Edit
-            </button>
-            <button
-              onClick={handleDelete}
-              className="bg-red-600 text-white px-3 py-1 rounded"
-            >
-              Delete
-            </button>
-          </div>
-        </>
-      )}
+      </div>
+
+      <div className="mt-8 pt-5 border-t border-gray-50 flex space-x-2">
+        <button className="flex-1 bg-gray-50 hover:bg-blue-50 text-gray-600 hover:text-blue-600 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center">
+          <HiOutlinePencilSquare className="mr-2 w-4 h-4" /> Edit
+        </button>
+        <button 
+          onClick={handleDelete}
+          className="bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-600 px-4 rounded-xl transition-all flex items-center justify-center"
+        >
+          <HiOutlineTrash className="w-5 h-5" />
+        </button>
+      </div>
     </div>
   );
 };

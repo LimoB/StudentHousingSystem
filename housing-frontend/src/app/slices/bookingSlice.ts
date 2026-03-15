@@ -5,6 +5,7 @@ import {
   getBookingById,
   createBooking,
   deleteBooking,
+  updateBookingStatus,
 } from "../../api/bookings";
 import type { Booking, CreateBookingPayload } from "../../api/bookings";
 
@@ -105,6 +106,27 @@ export const deleteBookingAction = createAsyncThunk(
     }
   }
 );
+
+/* UPDATE BOOKING STATUS */
+export const updateBookingStatusAction = createAsyncThunk(
+  "bookings/updateStatus",
+  async ({ id, status }: { id: number; status: string }, thunkAPI) => {
+    try {
+      // updateBookingStatus is already in your api/bookings.ts
+      return await updateBookingStatus(id, status);
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to update status");
+    }
+  }
+);
+
+// Add this to your extraReducers builder:
+// .addCase(updateBookingStatusAction.fulfilled, (state, action) => {
+//   const index = state.bookings.findIndex((b) => b.id === action.payload.id);
+//   if (index !== -1) {
+//     state.bookings[index] = action.payload;
+//   }
+// })
 
 /* =========================
    SLICE

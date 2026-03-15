@@ -68,6 +68,7 @@ export const properties = pgTable("properties", {
   createdAt: timestamp("created_at").defaultNow()
 });
 
+
 export const units = pgTable("units", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   propertyId: integer("property_id")
@@ -75,8 +76,15 @@ export const units = pgTable("units", {
     .notNull(),
   unitNumber: varchar("unit_number", { length: 20 }).notNull(),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  
+  // Added the size field here
+  size: varchar("size", { length: 50 }).default("Single Room"), 
+  
   isAvailable: boolean("is_available").default(true),
-  createdAt: timestamp("created_at").defaultNow()
+  createdAt: timestamp("created_at").defaultNow(),
+  
+  // Added updatedAt to fix the "Invalid Date" issue in the UI when tracking edits
+  updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date())
 });
 
 export const bookings = pgTable("bookings", {
