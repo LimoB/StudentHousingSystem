@@ -1,4 +1,3 @@
-// src/app/slices/unitSlice.ts
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
   getUnits,
@@ -32,7 +31,7 @@ export const fetchUnits = createAsyncThunk(
     try {
       return await getUnits();
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch units");
     }
   }
 );
@@ -43,7 +42,7 @@ export const fetchUnitsByProperty = createAsyncThunk(
     try {
       return await getUnitsByProperty(propertyId);
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch property units");
     }
   }
 );
@@ -54,7 +53,7 @@ export const createUnitAction = createAsyncThunk(
     try {
       return await createUnit(payload);
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to create unit");
     }
   }
 );
@@ -65,7 +64,7 @@ export const updateUnitAction = createAsyncThunk(
     try {
       return await updateUnit(id, data);
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to update unit");
     }
   }
 );
@@ -77,7 +76,7 @@ export const deleteUnitAction = createAsyncThunk(
       await deleteUnit(id);
       return id;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to delete unit");
     }
   }
 );
@@ -88,12 +87,17 @@ export const deleteUnitAction = createAsyncThunk(
 const unitSlice = createSlice({
   name: "units",
   initialState,
-  reducers: {},
+  reducers: {
+    clearUnitError: (state) => {
+      state.error = null;
+    }
+  },
   extraReducers: (builder) => {
     builder
       /* FETCH ALL */
       .addCase(fetchUnits.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(fetchUnits.fulfilled, (state, action) => {
         state.loading = false;
@@ -105,28 +109,54 @@ const unitSlice = createSlice({
       })
 
       /* FETCH BY PROPERTY */
+      .addCase(fetchUnitsByProperty.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchUnitsByProperty.fulfilled, (state, action) => {
+        state.loading = false;
         state.units = action.payload;
+      })
+      .addCase(fetchUnitsByProperty.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       })
 
       /* CREATE */
+      .addCase(createUnitAction.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(createUnitAction.fulfilled, (state, action) => {
-        state.units.push(action.payload.unit);
+        state.loading = false;
+        // Adjusting based on common API response structures
+        const newUnit = action.payload.unit || action.payload;
+        state.units.push(newUnit);
+      })
+      .addCase(createUnitAction.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       })
 
       /* UPDATE */
       .addCase(updateUnitAction.fulfilled, (state, action) => {
-        const { id } = action.meta.arg;
+        state.loading = false;
+        const updatedUnit = action.payload.unit || action.payload;
         state.units = state.units.map((u) =>
-          u.id === id ? { ...u, ...action.meta.arg.data } : u
+          u.id === updatedUnit.id ? updatedUnit : u
         );
       })
 
       /* DELETE */
       .addCase(deleteUnitAction.fulfilled, (state, action) => {
+        state.loading = false;
         state.units = state.units.filter((u) => u.id !== action.payload);
+      })
+      .addCase(deleteUnitAction.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
       });
   },
 });
 
+export const { clearUnitError } = unitSlice.actions;
 export default unitSlice.reducer;

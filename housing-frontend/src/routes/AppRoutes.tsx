@@ -1,64 +1,56 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-
 import PublicRoutes from "./PublicRoutes";
 import AdminRoutes from "./AdminRoutes";
 import LandlordRoutes from "./LandlordRoutes";
 import StudentRoutes from "./StudentRoutes";
-
 import ProtectedRoute from "./ProtectedRoute";
-import RoleBasedRoute from "./RoleBasedRoute";
-
 import DashboardLayout from "../layouts/DashboardLayout";
 
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* PUBLIC */}
+      {/* PUBLIC ROUTES (Login, Register, etc.) */}
       {PublicRoutes()}
 
-      {/* ADMIN */}
+      {/* ADMIN SECTION */}
       <Route
         path="/admin"
         element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["admin"]}>
-              <DashboardLayout />
-            </RoleBasedRoute>
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <DashboardLayout />
           </ProtectedRoute>
         }
       >
         {AdminRoutes()}
       </Route>
 
-      {/* LANDLORD */}
+      {/* LANDLORD SECTION */}
       <Route
         path="/landlord"
         element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["landlord"]}>
-              <DashboardLayout />
-            </RoleBasedRoute>
+          <ProtectedRoute allowedRoles={["landlord"]}>
+            <DashboardLayout />
           </ProtectedRoute>
         }
       >
         {LandlordRoutes()}
       </Route>
 
-      {/* STUDENT */}
+      {/* STUDENT SECTION */}
       <Route
         path="/student"
         element={
-          <ProtectedRoute>
-            <RoleBasedRoute allowedRoles={["student"]}>
-              <DashboardLayout />
-            </RoleBasedRoute>
+          <ProtectedRoute allowedRoles={["student"]}>
+            <DashboardLayout />
           </ProtectedRoute>
         }
       >
         {StudentRoutes()}
       </Route>
 
-      <Route path="*" element={<Navigate to="/login" />} />
+      {/* CATCH-ALL REDIRECT */}
+      <Route path="/" element={<ProtectedRoute children={null} />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 };

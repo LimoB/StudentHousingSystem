@@ -2,177 +2,164 @@ import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
   FaBook,
-  FaHome,
   FaMoneyBillWave,
   FaTools,
   FaUsers,
   FaFileAlt,
   FaBuilding,
   FaBell,
-  FaDoorOpen
+  FaFileContract,
+  FaChartLine
 } from "react-icons/fa";
+import type { RootState } from "../app/store";
 
 interface DashboardProps {
   type: "student" | "landlord" | "admin";
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ type }) => {
-  const { user } = useSelector((state: any) => state.auth);
+  const { user } = useSelector((state: RootState) => state.auth);
   const navigate = useNavigate();
 
   const widgets: any = {
     student: [
       {
         title: "Properties",
-        description: "Browse available properties",
+        description: "Browse available houses and units",
         icon: <FaBuilding />,
-        color: "border-purple-500",
+        color: "from-purple-500 to-purple-600",
         path: "/properties"
       },
       {
-        title: "Units",
-        description: "View available rooms and units",
-        icon: <FaDoorOpen />,
-        color: "border-pink-500",
-        path: "/units"
-      },
-      {
         title: "Bookings",
-        description: "Manage your booking requests",
+        description: "Track your pending requests",
         icon: <FaBook />,
-        color: "border-blue-500",
+        color: "from-blue-500 to-blue-600",
         path: "/bookings"
       },
       {
         title: "Payments",
-        description: "Track rent payments",
+        description: "View receipts and pay rent",
         icon: <FaMoneyBillWave />,
-        color: "border-green-500",
+        color: "from-green-500 to-green-600",
         path: "/payments"
       },
       {
         title: "Leases",
-        description: "View lease agreements",
-        icon: <FaHome />,
-        color: "border-indigo-500",
+        description: "Active rental agreements",
+        icon: <FaFileContract />,
+        color: "from-indigo-500 to-indigo-600",
         path: "/leases"
       },
       {
         title: "Maintenance",
-        description: "Submit maintenance requests",
+        description: "Report a broken item",
         icon: <FaTools />,
-        color: "border-yellow-500",
+        color: "from-orange-500 to-orange-600",
         path: "/maintenance"
       },
       {
         title: "Notifications",
-        description: "View system notifications",
+        description: "Updates and alerts",
         icon: <FaBell />,
-        color: "border-gray-500",
+        color: "from-pink-500 to-pink-600",
         path: "/notifications"
       }
     ],
 
     landlord: [
       {
-        title: "Properties",
-        description: "Manage your properties",
+        title: "My Properties",
+        description: "Manage units and pricing",
         icon: <FaBuilding />,
-        color: "border-purple-500",
+        color: "from-purple-500 to-purple-600",
         path: "/properties"
       },
       {
-        title: "Units",
-        description: "Manage property units",
-        icon: <FaDoorOpen />,
-        color: "border-pink-500",
-        path: "/units"
-      },
-      {
-        title: "Bookings",
-        description: "Approve or reject bookings",
+        title: "Booking Requests",
+        description: "Approve or reject students",
         icon: <FaBook />,
-        color: "border-blue-500",
+        color: "from-blue-500 to-blue-600",
         path: "/bookings"
       },
       {
-        title: "Payments",
-        description: "Track tenant payments",
+        title: "Revenue",
+        description: "Track monthly earnings",
         icon: <FaMoneyBillWave />,
-        color: "border-green-500",
+        color: "from-green-500 to-green-600",
         path: "/payments"
       },
       {
-        title: "Leases",
+        title: "Contracts",
         description: "Manage lease agreements",
-        icon: <FaHome />,
-        color: "border-indigo-500",
+        icon: <FaFileContract />,
+        color: "from-indigo-500 to-indigo-600",
         path: "/leases"
       },
       {
-        title: "Maintenance",
-        description: "Handle tenant maintenance requests",
+        title: "Work Orders",
+        description: "Handle repair requests",
         icon: <FaTools />,
-        color: "border-yellow-500",
+        color: "from-orange-500 to-orange-600",
         path: "/maintenance"
+      },
+      {
+        title: "My Tenants",
+        description: "View resident information",
+        icon: <FaUsers />,
+        color: "from-teal-500 to-teal-600",
+        path: "/tenants"
       }
     ],
 
     admin: [
       {
-        title: "Users",
-        description: "Manage all system users",
+        title: "System Users",
+        description: "Manage student/landlord accounts",
         icon: <FaUsers />,
-        color: "border-red-500",
+        color: "from-red-500 to-red-600",
         path: "/users"
       },
       {
-        title: "Properties",
-        description: "View all properties",
+        title: "All Properties",
+        description: "Audit housing inventory",
         icon: <FaBuilding />,
-        color: "border-purple-500",
+        color: "from-purple-500 to-purple-600",
         path: "/properties"
       },
       {
-        title: "Units",
-        description: "View all property units",
-        icon: <FaDoorOpen />,
-        color: "border-pink-500",
-        path: "/units"
-      },
-      {
-        title: "Bookings",
-        description: "Monitor all bookings",
+        title: "All Bookings",
+        description: "Monitor system transactions",
         icon: <FaBook />,
-        color: "border-blue-500",
+        color: "from-blue-500 to-blue-600",
         path: "/bookings"
       },
       {
-        title: "Payments",
-        description: "Track all system payments",
+        title: "Finance",
+        description: "Global payment tracking",
         icon: <FaMoneyBillWave />,
-        color: "border-green-500",
+        color: "from-green-500 to-green-600",
         path: "/payments"
       },
       {
         title: "Leases",
-        description: "View active leases",
-        icon: <FaHome />,
-        color: "border-indigo-500",
+        description: "Monitor active contracts",
+        icon: <FaFileContract />,
+        color: "from-indigo-500 to-indigo-600",
         path: "/leases"
       },
       {
         title: "Maintenance",
-        description: "Monitor maintenance requests",
+        description: "Overall service status",
         icon: <FaTools />,
-        color: "border-yellow-500",
+        color: "from-orange-500 to-orange-600",
         path: "/maintenance"
       },
       {
-        title: "Reports",
-        description: "Generate reports",
-        icon: <FaFileAlt />,
-        color: "border-teal-500",
+        title: "System Reports",
+        description: "Analytics and logs",
+        icon: <FaChartLine />,
+        color: "from-teal-500 to-teal-600",
         path: "/reports"
       }
     ]
@@ -183,33 +170,53 @@ const Dashboard: React.FC<DashboardProps> = ({ type }) => {
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-3xl font-bold mb-2 text-gray-800">
-        Welcome {user?.fullName || "User"} (
-        {type.charAt(0).toUpperCase() + type.slice(1)})
-      </h1>
+    <div className="p-8 max-w-7xl mx-auto">
+      {/* Header Section */}
+      <div className="mb-10">
+        <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+          Welcome back, <span className="text-blue-600">{user?.fullName?.split(' ')[0] || "User"}</span>!
+        </h1>
+        <div className="flex items-center gap-2 mt-2">
+          <span className="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-black uppercase tracking-widest rounded-lg border border-blue-100">
+            {type} Access
+          </span>
+          <p className="text-gray-500 font-medium">
+            {type === "student" && "Everything you need for your campus housing is right here."}
+            {type === "landlord" && "Manage your assets and track your business growth."}
+            {type === "admin" && "Total system oversight and administrative control."}
+          </p>
+        </div>
+      </div>
 
-      <p className="text-gray-600 mb-6">
-        {type === "student" && "Manage your housing, bookings, and payments."}
-        {type === "landlord" && "Manage your properties and tenants."}
-        {type === "admin" && "System administration dashboard."}
-      </p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Widgets Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {widgets[type].map((widget: any) => (
           <div
             key={widget.title}
             onClick={() => handleNavigate(widget.path)}
-            className={`cursor-pointer bg-white shadow-md rounded-lg p-5 flex flex-col justify-between transform transition-transform hover:scale-105 border-l-4 ${widget.color}`}
+            className="group relative bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-blue-100/50 transition-all duration-500 cursor-pointer overflow-hidden active:scale-95"
           >
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="text-2xl text-gray-700">{widget.icon}</div>
-              <h2 className="text-lg font-semibold text-gray-800">
+            {/* Animated Gradient Background on Hover */}
+            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${widget.color} opacity-0 group-hover:opacity-5 transition-opacity duration-500 rounded-bl-[5rem]`} />
+
+            <div className="relative z-10">
+              <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${widget.color} text-white flex items-center justify-center text-2xl shadow-lg mb-6 group-hover:rotate-6 transition-transform duration-300`}>
+                {widget.icon}
+              </div>
+
+              <h2 className="text-2xl font-black text-gray-800 mb-2 tracking-tight">
                 {widget.title}
               </h2>
+
+              <p className="text-gray-500 font-medium leading-relaxed">
+                {widget.description}
+              </p>
             </div>
 
-            <p className="text-gray-500">{widget.description}</p>
+            {/* Bottom Arrow Indicator */}
+            <div className="mt-8 flex items-center text-sm font-black text-blue-600 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+              Go to {widget.title} <span className="ml-2">→</span>
+            </div>
           </div>
         ))}
       </div>
