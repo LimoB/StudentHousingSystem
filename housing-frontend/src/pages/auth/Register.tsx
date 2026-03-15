@@ -1,11 +1,12 @@
-// src/pages/auth/Register.tsx
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { register } from "../../app/slices/authSlice";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import type { AppDispatch } from "../../app/store";
 
 const Register: React.FC = () => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const { loading, error } = useSelector((state: any) => state.auth);
 
@@ -15,6 +16,10 @@ const Register: React.FC = () => {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"student" | "landlord" | "admin">("student");
 
+  useEffect(() => {
+    if (error) toast.error(error);
+  }, [error]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const resultAction: any = await dispatch(
@@ -22,60 +27,67 @@ const Register: React.FC = () => {
     );
 
     if (register.fulfilled.match(resultAction)) {
-      navigate("/dashboard"); // redirect to dashboard after registration
+      toast.success("Account created successfully!");
+      navigate("/dashboard");
+    } else if (register.rejected.match(resultAction)) {
+      toast.error(
+        typeof resultAction.payload === "string"
+          ? resultAction.payload
+          : "Registration failed. Please try again."
+      );
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <form
         onSubmit={handleSubmit}
-        className="bg-white p-8 rounded shadow-md w-full max-w-md"
+        className="bg-white p-10 rounded-xl shadow-lg w-full max-w-md transition-transform transform hover:scale-105"
       >
-        <h2 className="text-2xl font-bold mb-6 text-center">Register</h2>
+        <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">
+          Register
+        </h2>
 
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-
-        <label className="block mb-2">Full Name</label>
+        <label className="block mb-2 text-gray-700 font-medium">Full Name</label>
         <input
           type="text"
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           required
-          className="w-full p-2 border rounded mb-4"
+          className="w-full p-3 border border-gray-300 rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-green-500"
         />
 
-        <label className="block mb-2">Email</label>
+        <label className="block mb-2 text-gray-700 font-medium">Email</label>
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full p-2 border rounded mb-4"
+          className="w-full p-3 border border-gray-300 rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-green-500"
         />
 
-        <label className="block mb-2">Phone (Optional)</label>
+        <label className="block mb-2 text-gray-700 font-medium">Phone (Optional)</label>
         <input
           type="text"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          className="w-full p-2 border rounded mb-4"
+          className="w-full p-3 border border-gray-300 rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-green-500"
         />
 
-        <label className="block mb-2">Password</label>
+        <label className="block mb-2 text-gray-700 font-medium">Password</label>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          className="w-full p-2 border rounded mb-4"
+          className="w-full p-3 border border-gray-300 rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-green-500"
         />
 
-        <label className="block mb-2">Role</label>
+        <label className="block mb-2 text-gray-700 font-medium">Role</label>
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as any)}
-          className="w-full p-2 border rounded mb-4"
+          className="w-full p-3 border border-gray-300 rounded-md mb-6 focus:outline-none focus:ring-2 focus:ring-green-500"
         >
           <option value="student">Student</option>
           <option value="landlord">Landlord</option>
@@ -84,16 +96,16 @@ const Register: React.FC = () => {
 
         <button
           type="submit"
-          className="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
+          className="w-full bg-green-600 text-white py-3 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
           disabled={loading}
         >
           {loading ? "Registering..." : "Register"}
         </button>
 
-        <p className="mt-4 text-center">
+        <p className="mt-5 text-center text-gray-600">
           Already have an account?{" "}
           <span
-            className="text-blue-600 cursor-pointer"
+            className="text-blue-600 font-medium cursor-pointer hover:underline"
             onClick={() => navigate("/login")}
           >
             Login

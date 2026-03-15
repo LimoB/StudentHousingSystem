@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and, SQL } from "drizzle-orm";
 import db from "../drizzle/db";
 import { properties } from "../drizzle/schema";
 
@@ -7,21 +7,38 @@ export type TPropertySelect = typeof properties.$inferSelect;
 
 /* ================================
    GET ALL PROPERTIES
+   - Students see only 'available', landlords/admins see all
 ================================ */
+export const getPropertiesService = async (
+  filter?: { status?: "available" | "occupied" }
+): Promise<TPropertySelect[]> => {
+  if (filter?.status) {
+    return await db.query.properties.findMany({
+      where: eq(properties.status, filter.status),
+    });
+  }
 
-export const getPropertiesService = async (): Promise<TPropertySelect[]> => {
   return await db.query.properties.findMany();
 };
 
 /* ================================
    GET PROPERTY BY ID
+   - Optionally restrict by status (students cannot see occupied)
 ================================ */
-
 export const getPropertyByIdService = async (
-  propertyId: number
+  propertyId: number,
+  filter?: { status?: "available" | "occupied" }
 ): Promise<TPropertySelect | null> => {
+  // Always start with a valid condition
+  let condition: SQL<unknown> = eq(properties.id, propertyId);
+
+  // If a status filter exists, combine it using `and`
+  if (filter?.status) {
+    condition = and(condition, eq(properties.status, filter.status))!;
+  }
+
   const property = await db.query.properties.findFirst({
-    where: eq(properties.id, propertyId),
+    where: condition,
   });
 
   return property ?? null;
@@ -29,8 +46,8 @@ export const getPropertyByIdService = async (
 
 /* ================================
    CREATE PROPERTY
+   - Landlords/Admins only (handled in controller)
 ================================ */
-
 export const createPropertyService = async (
   property: TPropertyInsert
 ): Promise<TPropertySelect> => {
@@ -44,8 +61,8 @@ export const createPropertyService = async (
 
 /* ================================
    UPDATE PROPERTY
+   - Landlords/Admins only (handled in controller)
 ================================ */
-
 export const updatePropertyService = async (
   propertyId: number,
   updates: Partial<TPropertyInsert>
@@ -65,8 +82,8 @@ export const updatePropertyService = async (
 
 /* ================================
    DELETE PROPERTY
+   - Landlords/Admins only (handled in controller)
 ================================ */
-
 export const deletePropertyService = async (
   propertyId: number
 ): Promise<boolean> => {

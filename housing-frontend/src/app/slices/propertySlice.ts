@@ -6,14 +6,16 @@ import {
   createProperty,
   updateProperty,
   deleteProperty,
+  Property,
+  CreatePropertyPayload,
 } from "../../api/properties";
 
 /* =========================
    STATE
 ========================= */
 interface PropertyState {
-  properties: any[];
-  selectedProperty: any | null; // added for property by ID
+  properties: Property[];
+  selectedProperty: Property | null;
   loading: boolean;
   error: string | null;
 }
@@ -30,65 +32,109 @@ const initialState: PropertyState = {
 ========================= */
 
 // Fetch all properties
-export const fetchProperties = createAsyncThunk(
-  "properties/fetchAll",
-  async (_, thunkAPI) => {
-    try {
-      return await getProperties();
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch properties");
-    }
-  }
-);
+export const fetchProperties = createAsyncThunk<
+  Property[],
+  void,
+  { rejectValue: string }
+>("properties/fetchAll", async (_, thunkAPI) => {
+  const token = localStorage.getItem("token");
+  if (!token) return thunkAPI.rejectWithValue("No auth token, please login");
 
-// Fetch a single property by ID
-export const fetchPropertyById = createAsyncThunk(
-  "properties/fetchById",
-  async (id: number, thunkAPI) => {
-    try {
-      return await getPropertyById(id);
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch property");
-    }
+  try {
+    const result = await getProperties();
+    console.log("✅ Fetched all properties:", result.length);
+    return result;
+  } catch (error: any) {
+    console.error("❌ Failed to fetch properties:", error.message);
+    return thunkAPI.rejectWithValue(
+      error.response?.data?.message || "Failed to fetch properties"
+    );
   }
-);
+});
 
-// Create a property
-export const createPropertyAction = createAsyncThunk(
-  "properties/create",
-  async (payload: any, thunkAPI) => {
-    try {
-      return await createProperty(payload);
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to create property");
-    }
-  }
-);
+// Fetch property by ID
+export const fetchPropertyById = createAsyncThunk<
+  Property,
+  number,
+  { rejectValue: string }
+>("properties/fetchById", async (id, thunkAPI) => {
+  const token = localStorage.getItem("token");
+  if (!token) return thunkAPI.rejectWithValue("No auth token, please login");
 
-// Update a property
-export const updatePropertyAction = createAsyncThunk(
-  "properties/update",
-  async ({ id, data }: { id: number; data: any }, thunkAPI) => {
-    try {
-      return await updateProperty(id, data);
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to update property");
-    }
+  try {
+    const result = await getPropertyById(id);
+    console.log("✅ Fetched property by ID:", result);
+    return result;
+  } catch (error: any) {
+    console.error("❌ Failed to fetch property:", error.message);
+    return thunkAPI.rejectWithValue(
+      error.response?.data?.message || "Failed to fetch property"
+    );
   }
-);
+});
 
-// Delete a property
-export const deletePropertyAction = createAsyncThunk(
-  "properties/delete",
-  async (id: number, thunkAPI) => {
-    try {
-      await deleteProperty(id);
-      return id;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to delete property");
-    }
+// Create property
+export const createPropertyAction = createAsyncThunk<
+  Property,
+  CreatePropertyPayload,
+  { rejectValue: string }
+>("properties/create", async (payload, thunkAPI) => {
+  const token = localStorage.getItem("token");
+  if (!token) return thunkAPI.rejectWithValue("No auth token, please login");
+
+  try {
+    const result = await createProperty(payload);
+    console.log("✅ Created property:", result);
+    return result;
+  } catch (error: any) {
+    console.error("❌ Failed to create property:", error.message);
+    return thunkAPI.rejectWithValue(
+      error.response?.data?.message || "Failed to create property"
+    );
   }
-);
+});
+
+// Update property
+export const updatePropertyAction = createAsyncThunk<
+  Property,
+  { id: number; data: Partial<CreatePropertyPayload> },
+  { rejectValue: string }
+>("properties/update", async ({ id, data }, thunkAPI) => {
+  const token = localStorage.getItem("token");
+  if (!token) return thunkAPI.rejectWithValue("No auth token, please login");
+
+  try {
+    const result = await updateProperty(id, data);
+    console.log("✅ Updated property:", result);
+    return result;
+  } catch (error: any) {
+    console.error("❌ Failed to update property:", error.message);
+    return thunkAPI.rejectWithValue(
+      error.response?.data?.message || "Failed to update property"
+    );
+  }
+});
+
+// Delete property
+export const deletePropertyAction = createAsyncThunk<
+  number,
+  number,
+  { rejectValue: string }
+>("properties/delete", async (id, thunkAPI) => {
+  const token = localStorage.getItem("token");
+  if (!token) return thunkAPI.rejectWithValue("No auth token, please login");
+
+  try {
+    await deleteProperty(id);
+    console.log("✅ Deleted property:", id);
+    return id;
+  } catch (error: any) {
+    console.error("❌ Failed to delete property:", error.message);
+    return thunkAPI.rejectWithValue(
+      error.response?.data?.message || "Failed to delete property"
+    );
+  }
+});
 
 /* =========================
    SLICE
@@ -99,11 +145,10 @@ const propertySlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      /* =========================
-         FETCH ALL
-      ========================== */
+      // FETCH ALL
       .addCase(fetchProperties.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(fetchProperties.fulfilled, (state, action) => {
         state.loading = false;
@@ -111,15 +156,14 @@ const propertySlice = createSlice({
       })
       .addCase(fetchProperties.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload || "Failed to fetch properties";
       })
 
-      /* =========================
-         FETCH BY ID
-      ========================== */
+      // FETCH BY ID
       .addCase(fetchPropertyById.pending, (state) => {
         state.loading = true;
         state.selectedProperty = null;
+        state.error = null;
       })
       .addCase(fetchPropertyById.fulfilled, (state, action) => {
         state.loading = false;
@@ -127,30 +171,26 @@ const propertySlice = createSlice({
       })
       .addCase(fetchPropertyById.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
         state.selectedProperty = null;
+        state.error = action.payload || "Failed to fetch property";
       })
 
-      /* =========================
-         CREATE
-      ========================== */
+      // CREATE
       .addCase(createPropertyAction.fulfilled, (state, action) => {
-        state.properties.push(action.payload.property);
+        if (action.payload) {
+          state.properties.push(action.payload);
+        }
       })
 
-      /* =========================
-         UPDATE
-      ========================== */
+      // UPDATE
       .addCase(updatePropertyAction.fulfilled, (state, action) => {
-        const { id } = action.meta.arg;
+        const updated = action.payload;
         state.properties = state.properties.map((p) =>
-          p.id === id ? { ...p, ...action.meta.arg.data } : p
+          p.id === updated.id ? { ...p, ...updated } : p
         );
       })
 
-      /* =========================
-         DELETE
-      ========================== */
+      // DELETE
       .addCase(deletePropertyAction.fulfilled, (state, action) => {
         state.properties = state.properties.filter(
           (p) => p.id !== action.payload

@@ -11,25 +11,31 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { token, user } = useSelector((state: any) => state.auth);
   const location = useLocation();
 
-  // Not logged in → send to login
+  // If Redux hasn't loaded user/token yet, show nothing (or a loader)
+  if (token === undefined || user === undefined) {
+    return null; // or <LoadingSpinner /> if you have one
+  }
+
+  // Not logged in → redirect to login
   if (!token || !user) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // If user hits root "/", redirect to role-specific dashboard
+  // Redirect from root "/" to role-specific dashboard
   if (location.pathname === "/") {
     switch (user.role) {
       case "admin":
-        return <Navigate to="/dashboard/admin" replace />;
+        return <Navigate to="/admin/dashboard" replace />;
       case "landlord":
-        return <Navigate to="/dashboard/landlord" replace />;
+        return <Navigate to="/landlord/dashboard" replace />;
       case "student":
-        return <Navigate to="/dashboard/student" replace />;
+        return <Navigate to="/student/dashboard" replace />;
       default:
         return <Navigate to="/login" replace />;
     }
   }
 
+  // Allow access to child routes
   return <>{children}</>;
 };
 

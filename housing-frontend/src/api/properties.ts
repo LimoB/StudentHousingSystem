@@ -1,60 +1,59 @@
-// src/api/properties.ts
 import axiosClient from "./axios";
 
 /* =========================
    TYPES
 ========================= */
 export interface Property {
+  updatedAt: string | null;
   id: number;
   name: string;
   location: string;
-  description: string;
-  createdAt: string;
-  updatedAt: string;
+  description: string | null;
+  landlordId: number;
+  status: "available" | "occupied" | null;
+  createdAt: string | null;
 }
 
 export interface CreatePropertyPayload {
   name: string;
   location: string;
-  description: string;
+  description?: string;
+  landlordId?: number;
+  status?: "available" | "occupied";
 }
 
 /* =========================
-   GET ALL PROPERTIES
+   API FUNCTIONS
 ========================= */
-export const getProperties = async () => {
+export const getProperties = async (): Promise<Property[]> => {
+  console.log("API: getProperties");
   const res = await axiosClient.get("/properties");
   return res.data;
 };
 
-/* =========================
-   GET PROPERTY BY ID
-========================= */
-export const getPropertyById = async (id: number) => {
+export const getPropertyById = async (id: number): Promise<Property> => {
+  console.log("API: getPropertyById", id);
   const res = await axiosClient.get(`/properties/${id}`);
   return res.data;
 };
 
-/* =========================
-   CREATE PROPERTY
-========================= */
 export const createProperty = async (data: CreatePropertyPayload) => {
+  console.log("API: createProperty", data);
   const res = await axiosClient.post("/properties", data);
   return res.data;
 };
 
-/* =========================
-   UPDATE PROPERTY
-========================= */
-export const updateProperty = async (id: number, data: Partial<CreatePropertyPayload>) => {
+export const updateProperty = async (
+  id: number,
+  data: Partial<CreatePropertyPayload>
+) => {
+  console.log("API: updateProperty", id, data);
   const res = await axiosClient.put(`/properties/${id}`, data);
   return res.data;
 };
 
-/* =========================
-   DELETE PROPERTY
-========================= */
 export const deleteProperty = async (id: number) => {
+  console.log("API: deleteProperty", id);
   const res = await axiosClient.delete(`/properties/${id}`);
   return res.data;
 };

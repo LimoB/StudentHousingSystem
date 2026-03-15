@@ -10,14 +10,22 @@ import {
 /* ================================
    GET ALL PROPERTIES
 ================================ */
-
 export const getProperties = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const properties = await getPropertiesService();
+    const userRole = req.user?.role; // assume authMiddleware adds user to req
+    let properties;
+
+    if (userRole === "student") {
+      // Students see only available properties
+      properties = await getPropertiesService({ status: "available" });
+    } else {
+      // Landlords/Admins see all properties
+      properties = await getPropertiesService();
+    }
 
     res.status(200).json(properties);
   } catch (error) {
@@ -28,7 +36,6 @@ export const getProperties = async (
 /* ================================
    GET PROPERTY BY ID
 ================================ */
-
 export const getPropertyById = async (
   req: Request,
   res: Response,
@@ -37,16 +44,19 @@ export const getPropertyById = async (
   const propertyId = Number(req.params.id);
 
   if (isNaN(propertyId)) {
-    res.status(400).json({ message: "Invalid property ID" });
-    return;
+    return res.status(400).json({ message: "Invalid property ID" });
   }
 
   try {
     const property = await getPropertyByIdService(propertyId);
 
     if (!property) {
-      res.status(404).json({ message: "Property not found" });
-      return;
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    // Restrict students to only see available properties
+    if (req.user?.role === "student" && property.status !== "available") {
+      return res.status(403).json({ message: "Access denied" });
     }
 
     res.status(200).json(property);
@@ -58,7 +68,6 @@ export const getPropertyById = async (
 /* ================================
    CREATE PROPERTY
 ================================ */
-
 export const createProperty = async (
   req: Request,
   res: Response,
@@ -79,7 +88,6 @@ export const createProperty = async (
 /* ================================
    UPDATE PROPERTY
 ================================ */
-
 export const updateProperty = async (
   req: Request,
   res: Response,
@@ -88,8 +96,7 @@ export const updateProperty = async (
   const propertyId = Number(req.params.id);
 
   if (isNaN(propertyId)) {
-    res.status(400).json({ message: "Invalid property ID" });
-    return;
+    return res.status(400).json({ message: "Invalid property ID" });
   }
 
   try {
@@ -104,7 +111,6 @@ export const updateProperty = async (
 /* ================================
    DELETE PROPERTY
 ================================ */
-
 export const deleteProperty = async (
   req: Request,
   res: Response,
@@ -116,8 +122,7 @@ export const deleteProperty = async (
     const deleted = await deletePropertyService(propertyId);
 
     if (!deleted) {
-      res.status(404).json({ message: "Property not found" });
-      return;
+      return res.status(404).json({ message: "Property not found" });
     }
 
     res.status(200).json({

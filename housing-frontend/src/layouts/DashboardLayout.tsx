@@ -1,23 +1,30 @@
 // src/layouts/DashboardLayout.tsx
+
 import { Outlet } from "react-router-dom";
 import { useSelector } from "react-redux";
+import type { RootState } from "../app/store";
+
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 
 const DashboardLayout = () => {
-  const { user } = useSelector((state: any) => state.auth);
-  const role = user?.role || "student"; // default to student if somehow missing
+  const { user } = useSelector((state: RootState) => state.auth);
+
+  const role = user?.role || "student";
 
   return (
     <div className="flex h-screen bg-gray-100">
 
-      {/* Sidebar gets role */}
+      {/* Sidebar */}
       <Sidebar role={role} />
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex flex-col flex-1 overflow-hidden">
+
+        {/* Navbar */}
         <Navbar />
 
-        <main className="p-6 overflow-y-auto">
+        {/* Main content */}
+        <main className="flex-1 p-6 overflow-y-auto">
           <Outlet />
         </main>
 

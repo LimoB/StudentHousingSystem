@@ -11,7 +11,6 @@ import {
 /* ================================
    GET ALL BOOKINGS (ADMIN)
 ================================ */
-
 export const getBookings = async (
   req: Request,
   res: Response,
@@ -19,7 +18,6 @@ export const getBookings = async (
 ) => {
   try {
     const bookings = await getBookingsService();
-
     res.status(200).json(bookings);
   } catch (error) {
     next(error);
@@ -29,26 +27,17 @@ export const getBookings = async (
 /* ================================
    GET BOOKING BY ID
 ================================ */
-
 export const getBookingById = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   const bookingId = Number(req.params.id);
-
-  if (isNaN(bookingId)) {
-    res.status(400).json({ message: "Invalid booking ID" });
-    return;
-  }
+  if (isNaN(bookingId)) return res.status(400).json({ message: "Invalid booking ID" });
 
   try {
     const booking = await getBookingByIdService(bookingId);
-
-    if (!booking) {
-      res.status(404).json({ message: "Booking not found" });
-      return;
-    }
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
 
     res.status(200).json(booking);
   } catch (error) {
@@ -59,20 +48,15 @@ export const getBookingById = async (
 /* ================================
    GET MY BOOKINGS
 ================================ */
-
 export const getMyBookings = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    if (!req.user) {
-      res.status(401).json({ message: "Unauthorized" });
-      return;
-    }
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
     const bookings = await getStudentBookingsService(req.user.userId);
-
     res.status(200).json(bookings);
   } catch (error) {
     next(error);
@@ -82,17 +66,13 @@ export const getMyBookings = async (
 /* ================================
    CREATE BOOKING (STUDENT)
 ================================ */
-
 export const createBooking = async (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    if (!req.user) {
-      res.status(401).json({ message: "Unauthorized" });
-      return;
-    }
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
     const booking = await createBookingService({
       ...req.body,
@@ -111,7 +91,6 @@ export const createBooking = async (
 /* ================================
    UPDATE BOOKING STATUS
 ================================ */
-
 export const updateBookingStatus = async (
   req: Request,
   res: Response,
@@ -121,11 +100,7 @@ export const updateBookingStatus = async (
   const { status } = req.body;
 
   try {
-    const message = await updateBookingStatusService(
-      bookingId,
-      status
-    );
-
+    const message = await updateBookingStatusService(bookingId, status);
     res.status(200).json({ message });
   } catch (error) {
     next(error);
@@ -135,7 +110,6 @@ export const updateBookingStatus = async (
 /* ================================
    DELETE BOOKING
 ================================ */
-
 export const deleteBooking = async (
   req: Request,
   res: Response,
@@ -145,15 +119,9 @@ export const deleteBooking = async (
 
   try {
     const deleted = await deleteBookingService(bookingId);
+    if (!deleted) return res.status(404).json({ message: "Booking not found" });
 
-    if (!deleted) {
-      res.status(404).json({ message: "Booking not found" });
-      return;
-    }
-
-    res.status(200).json({
-      message: "Booking deleted successfully",
-    });
+    res.status(200).json({ message: "Booking deleted successfully" });
   } catch (error) {
     next(error);
   }
