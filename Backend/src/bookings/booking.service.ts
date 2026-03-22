@@ -1,7 +1,8 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import db from "../drizzle/db";
-// All tables and enums now come from one place
 import { bookings, units } from "../drizzle/schema";
+
+// export type TBookingInsert = typeof bookings.$inferInsert;
 
 export type TBookingInsert = typeof bookings.$inferInsert;
 export type TBookingSelect = typeof bookings.$inferSelect;
@@ -57,21 +58,39 @@ export const getStudentBookingsService = async (
 };
 
 /* ================================
-   CREATE BOOKING
+   CREATE BOOKING (Updated with Availability Check)
 ================================ */
-export const createBookingService = async (
-  booking: TBookingInsert
-): Promise<any> => {
-  // Create booking
-  const result = await db.insert(bookings).values(booking).returning();
-  const newBookingId = result[0].id;
+export const createBookingService = async (booking: TBookingInsert): Promise<any> => {
+  // 1. Check if the unit is actually available
+  const unit = await db.query.units.findFirst({
+    where: eq(units.id, booking.unitId),
+  });
 
-  // Fetch full booking with relations
-  return await getBookingByIdService(newBookingId);
+  if (!unit || !unit.isAvailable) {
+    throw new Error("This unit is no longer available for booking.");
+  }
+
+  // 2. Check if this specific student already has a PENDING booking for this unit
+  // This prevents spamming the payment records
+  const existing = await db.query.bookings.findFirst({
+    where: and(
+      eq(bookings.studentId, booking.studentId),
+      eq(bookings.unitId, booking.unitId),
+      eq(bookings.status, "pending")
+    )
+  });
+
+  if (existing) return await getBookingByIdService(existing.id);
+
+  // 3. Create booking
+  const result = await db.insert(bookings).values(booking).returning();
+  return await getBookingByIdService(result[0].id);
 };
+
 
 /* ================================
    UPDATE BOOKING STATUS
+   (Simplified: In Option 1, 'approved' happens via Payment Service)
 ================================ */
 export const updateBookingStatusService = async (
   bookingId: number,
@@ -84,15 +103,11 @@ export const updateBookingStatusService = async (
 
   if (!result.length) throw new Error("Booking not found");
 
-  // If approved, mark unit as unavailable
-  if (status === "approved") {
-    const booking = result[0];
-    await db.update(units)
-      .set({ isAvailable: false })
-      .where(eq(units.id, booking.unitId));
-  }
+  // NOTE: In Option 1, we don't handle 'approved' here 
+  // because the Lease creation and Unit lock happen in PaymentService.
+  // This function is now mainly for 'rejected' or 'pending' overrides.
 
-  return "Booking updated successfully";
+  return `Booking status updated to ${status}`;
 };
 
 /* ================================

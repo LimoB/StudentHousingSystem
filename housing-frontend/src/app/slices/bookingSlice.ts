@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, PayloadAction, Action } from "@reduxjs/toolkit";
 import {
   getBookings,
   getMyBookings,
@@ -31,22 +31,16 @@ const initialState: BookingState = {
    THUNKS
 ========================= */
 
-/* GET ALL BOOKINGS */
-
 export const fetchBookings = createAsyncThunk(
   "bookings/fetchBookings",
   async (_, thunkAPI) => {
     try {
       return await getBookings();
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error?.response?.data?.message || "Failed to fetch bookings"
-      );
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch bookings");
     }
   }
 );
-
-/* GET MY BOOKINGS */
 
 export const fetchMyBookings = createAsyncThunk(
   "bookings/fetchMyBookings",
@@ -54,14 +48,10 @@ export const fetchMyBookings = createAsyncThunk(
     try {
       return await getMyBookings();
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error?.response?.data?.message || "Failed to fetch my bookings"
-      );
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch my bookings");
     }
   }
 );
-
-/* GET BOOKING BY ID */
 
 export const fetchBookingById = createAsyncThunk(
   "bookings/fetchBookingById",
@@ -69,29 +59,34 @@ export const fetchBookingById = createAsyncThunk(
     try {
       return await getBookingById(id);
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error?.response?.data?.message || "Failed to fetch booking"
-      );
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch booking");
     }
   }
 );
-
-/* CREATE BOOKING */
 
 export const createBookingAction = createAsyncThunk(
   "bookings/createBooking",
   async (payload: CreateBookingPayload, thunkAPI) => {
     try {
-      return await createBooking(payload);
+      const response = await createBooking(payload);
+      return response.booking; 
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error?.response?.data?.message || "Failed to create booking"
-      );
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to create booking");
     }
   }
 );
 
-/* DELETE BOOKING */
+export const updateBookingStatusAction = createAsyncThunk(
+  "bookings/updateStatus",
+  async ({ id, status }: { id: number; status: "pending" | "approved" | "rejected" }, thunkAPI) => {
+    try {
+      await updateBookingStatus(id, status);
+      return { id, status }; 
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to update status");
+    }
+  }
+);
 
 export const deleteBookingAction = createAsyncThunk(
   "bookings/deleteBooking",
@@ -100,111 +95,94 @@ export const deleteBookingAction = createAsyncThunk(
       await deleteBooking(id);
       return id;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(
-        error?.response?.data?.message || "Failed to delete booking"
-      );
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to delete booking");
     }
   }
 );
-
-/* UPDATE BOOKING STATUS */
-export const updateBookingStatusAction = createAsyncThunk(
-  "bookings/updateStatus",
-  async ({ id, status }: { id: number; status: string }, thunkAPI) => {
-    try {
-      // updateBookingStatus is already in your api/bookings.ts
-      return await updateBookingStatus(id, status);
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to update status");
-    }
-  }
-);
-
-// Add this to your extraReducers builder:
-// .addCase(updateBookingStatusAction.fulfilled, (state, action) => {
-//   const index = state.bookings.findIndex((b) => b.id === action.payload.id);
-//   if (index !== -1) {
-//     state.bookings[index] = action.payload;
-//   }
-// })
 
 /* =========================
    SLICE
 ========================= */
 
+// Helper type for matcher payloads
+interface RejectedAction extends Action {
+  payload: string;
+}
+
 const bookingSlice = createSlice({
   name: "bookings",
   initialState,
-  reducers: {},
+  reducers: {
+    clearSelectedBooking: (state) => {
+      state.selectedBooking = null;
+    }
+  },
 
   extraReducers: (builder) => {
     builder
+      /* 1. SPECIFIC CASES (MUST BE FIRST) */
 
-      /* FETCH BOOKINGS */
-
-      .addCase(fetchBookings.pending, (state) => {
-        state.loading = true;
-        state.error = null;
+      // FETCH ALL/MY BOOKINGS
+      .addCase(fetchBookings.fulfilled, (state, action: PayloadAction<Booking[]>) => {
+        state.loading = false;
+        state.bookings = action.payload;
       })
-
-      .addCase(fetchBookings.fulfilled, (state, action) => {
+      .addCase(fetchMyBookings.fulfilled, (state, action: PayloadAction<Booking[]>) => {
         state.loading = false;
         state.bookings = action.payload;
       })
 
-      .addCase(fetchBookings.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
-
-      /* FETCH MY BOOKINGS */
-
-      .addCase(fetchMyBookings.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-
-      .addCase(fetchMyBookings.fulfilled, (state, action) => {
-        state.loading = false;
-        state.bookings = action.payload;
-      })
-
-      .addCase(fetchMyBookings.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
-
-      /* FETCH BOOKING BY ID */
-
-      .addCase(fetchBookingById.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-
-      .addCase(fetchBookingById.fulfilled, (state, action) => {
+      // FETCH BY ID
+      .addCase(fetchBookingById.fulfilled, (state, action: PayloadAction<Booking>) => {
         state.loading = false;
         state.selectedBooking = action.payload;
       })
 
-      .addCase(fetchBookingById.rejected, (state, action) => {
+      // CREATE BOOKING
+      .addCase(createBookingAction.fulfilled, (state, action: PayloadAction<Booking>) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.bookings.unshift(action.payload);
       })
 
-      /* CREATE BOOKING */
-
-      .addCase(createBookingAction.fulfilled, (state, action) => {
-        state.bookings.push(action.payload);
+      // UPDATE STATUS
+      .addCase(updateBookingStatusAction.fulfilled, (state, action: PayloadAction<{id: number, status: any}>) => {
+        state.loading = false;
+        const index = state.bookings.findIndex((b) => b.id === action.payload.id);
+        if (index !== -1) {
+          state.bookings[index].status = action.payload.status;
+        }
+        if (state.selectedBooking?.id === action.payload.id) {
+          state.selectedBooking.status = action.payload.status;
+        }
       })
 
-      /* DELETE BOOKING */
+      // DELETE BOOKING
+      .addCase(deleteBookingAction.fulfilled, (state, action: PayloadAction<number>) => {
+        state.loading = false;
+        state.bookings = state.bookings.filter((b) => b.id !== action.payload);
+        if (state.selectedBooking?.id === action.payload) {
+          state.selectedBooking = null;
+        }
+      })
 
-      .addCase(deleteBookingAction.fulfilled, (state, action) => {
-        state.bookings = state.bookings.filter(
-          (b) => b.id !== action.payload
-        );
-      });
+      /* 2. MATCHERS (MUST BE LAST) */
+
+      .addMatcher(
+        (action): action is Action => action.type.endsWith("/pending"),
+        (state) => {
+          state.loading = true;
+          state.error = null;
+        }
+      )
+      .addMatcher(
+        (action): action is RejectedAction => action.type.endsWith("/rejected"),
+        (state, action) => {
+          state.loading = false;
+          state.error = action.payload || "An unexpected error occurred";
+        }
+      );
   },
 });
 
+export const { clearSelectedBooking } = bookingSlice.actions;
 export default bookingSlice.reducer;

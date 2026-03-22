@@ -8,16 +8,12 @@ import {
 } from "../../../app/slices/bookingSlice";
 
 import type { RootState, AppDispatch } from "../../../app/store";
-import type { Booking } from "../../../api/bookings";
 
 const Bookings: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
-  const { bookings, loading, error } = useSelector(
-    (state: RootState) => state.bookings
-  );
-
+  const { bookings, loading, error } = useSelector((state: RootState) => state.bookings);
   const user = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
@@ -28,25 +24,35 @@ const Bookings: React.FC = () => {
     }
   }, [dispatch, user]);
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (booking: any) => {
+    // Check if the booking has payments (common cause of 500 delete errors)
+    if (booking.payments?.length > 0) {
+        alert("This booking has associated payment records and cannot be deleted. Contact support to cancel.");
+        return;
+    }
+
     if (window.confirm("Are you sure you want to cancel this booking?")) {
-      dispatch(deleteBookingAction(id));
+      dispatch(deleteBookingAction(booking.id));
     }
   };
 
   const handlePayment = (bookingId: number) => {
-    // Navigate to a payment/checkout page
     navigate(`/student/payment/${bookingId}`);
   };
 
   if (loading) return (
     <div className="p-10 text-center">
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
-      <p className="mt-4 text-gray-500">Loading your bookings...</p>
+      <p className="mt-4 text-gray-500 font-bold">Refreshing bookings...</p>
     </div>
   );
 
-  if (error) return <p className="p-6 text-red-500 font-bold text-center">{error}</p>;
+  if (error) return (
+    <div className="p-10 text-center">
+        <p className="text-red-500 font-bold mb-4">{error}</p>
+        <button onClick={() => window.location.reload()} className="text-blue-600 underline">Try again</button>
+    </div>
+  );
 
   return (
     <div className="p-6 max-w-6xl mx-auto min-h-screen">
@@ -70,7 +76,6 @@ const Bookings: React.FC = () => {
               key={booking.id} 
               className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition-shadow"
             >
-              {/* Info Section */}
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <h3 className="text-xl font-bold text-gray-900">
@@ -84,14 +89,13 @@ const Bookings: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-gray-500 font-medium">
-                  Room: <span className="text-gray-900">{booking.unit?.unitNumber || "N/A"}</span>
+                  Room: <span className="text-gray-900 font-bold">{booking.unit?.unitNumber || "N/A"}</span>
                 </p>
-                <p className="text-blue-600 font-bold mt-1">
+                <p className="text-blue-600 font-black mt-1">
                   Ksh {Number(booking.unit?.price || 0).toLocaleString()}
                 </p>
               </div>
 
-              {/* Date Section */}
               <div className="text-sm text-gray-400">
                 <p>Booked on:</p>
                 <p className="font-bold text-gray-600">
@@ -99,7 +103,6 @@ const Bookings: React.FC = () => {
                 </p>
               </div>
 
-              {/* Actions Section */}
               <div className="flex items-center gap-3">
                 {user?.role === "student" && booking.status === "pending" && (
                   <button
@@ -111,7 +114,7 @@ const Bookings: React.FC = () => {
                 )}
 
                 <button
-                  onClick={() => handleDelete(booking.id)}
+                  onClick={() => handleDelete(booking)}
                   className="px-4 py-2 text-red-500 hover:bg-red-50 rounded-xl transition text-sm font-semibold"
                 >
                   Cancel

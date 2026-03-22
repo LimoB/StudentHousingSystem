@@ -10,67 +10,63 @@ export interface Lease {
   unitId: number;
   startDate: string;
   endDate?: string;
-  status: string;
+  status: "active" | "ended" | string;
   createdAt: string;
+  // Relational data from Drizzle
+  student?: {
+    fullName: string;
+    email: string;
+    phone?: string;
+  };
+  unit?: {
+    unitNumber: string;
+    type: string;
+    price: number;
+    property?: {
+      name: string;
+      location: string;
+    };
+  };
 }
 
 export interface CreateLeasePayload {
-  studentId?: number; // optional, backend might auto-assign
+  studentId: number;
   unitId: number;
   startDate: string;
   endDate?: string;
 }
 
 /* =========================
-   GET ALL LEASES (ADMIN / LANDLORD)
+   API CALLS
 ========================= */
 
-export const getLeases = async () => {
-  const res = await axiosClient.get("/leases");
+export const getLeases = async (): Promise<Lease[]> => {
+  const res = await axiosClient.get<Lease[]>("/leases");
   return res.data;
 };
 
-/* =========================
-   GET MY LEASES (STUDENT)
-========================= */
-
-export const getMyLeases = async () => {
-  const res = await axiosClient.get("/leases/my-leases");
+export const getMyLeases = async (): Promise<Lease[]> => {
+  const res = await axiosClient.get<Lease[]>("/leases/my-leases");
   return res.data;
 };
 
-/* =========================
-   GET LEASE BY ID
-========================= */
-
-export const getLeaseById = async (id: number) => {
-  const res = await axiosClient.get(`/leases/${id}`);
+export const getLeaseById = async (id: number): Promise<Lease> => {
+  const res = await axiosClient.get<Lease>(`/leases/${id}`);
   return res.data;
 };
 
-/* =========================
-   CREATE LEASE (ADMIN / LANDLORD)
-========================= */
-
-export const createLease = async (data: CreateLeasePayload) => {
+// Backend returns { message: string, lease: Lease }
+export const createLease = async (data: CreateLeasePayload): Promise<{ message: string; lease: Lease }> => {
   const res = await axiosClient.post("/leases", data);
   return res.data;
 };
 
-/* =========================
-   END LEASE
-========================= */
-
-export const endLease = async (id: number) => {
+export const endLease = async (id: number): Promise<{ message: string }> => {
   const res = await axiosClient.put(`/leases/${id}/end`);
   return res.data;
 };
 
-/* =========================
-   DELETE LEASE
-========================= */
-
-export const deleteLease = async (id: number) => {
+export const deleteLease = async (id: number): Promise<{ message: string }> => {
   const res = await axiosClient.delete(`/leases/${id}`);
   return res.data;
 };

@@ -46,7 +46,8 @@ export const getBookingById = async (
 };
 
 /* ================================
-   GET MY BOOKINGS
+   GET MY BOOKINGS (STUDENT)
+   Standardized to use .userId from Auth Middleware
 ================================ */
 export const getMyBookings = async (
   req: Request,
@@ -54,9 +55,20 @@ export const getMyBookings = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
+    // 1. Check if user is attached by authMiddleware
+    // TypeScript knows 'userId' exists because of your 'declare global'
+    const studentId = req.user?.userId;
 
-    const bookings = await getStudentBookingsService(req.user.userId);
+    if (!studentId) {
+      return res.status(401).json({ 
+        message: "Unauthorized: Student profile not found in token" 
+      });
+    }
+
+    // 2. Fetch the student's specific bookings
+    const bookings = await getStudentBookingsService(studentId);
+
+    // 3. Return results
     res.status(200).json(bookings);
   } catch (error) {
     next(error);

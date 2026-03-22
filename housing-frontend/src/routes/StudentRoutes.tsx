@@ -5,6 +5,7 @@ import StudentDashboard from "../pages/student/dashboard/StudentDashboard";
 
 import Bookings from "../pages/student/bookings/Bookings";
 import BookingDetail from "../pages/student/bookings/BookingDetail";
+import PaymentBookingApproval from "../pages/student/bookings/PaymentBookingApproval"; // Import the new payment page
 
 import Leases from "../pages/student/leases/Leases";
 import LeaseDetail from "../pages/student/leases/LeaseDetail";
@@ -22,7 +23,6 @@ import PropertyDetail from "../pages/student/properties/PropertyDetail";
 import BookProperty from "../pages/student/properties/BookProperty";
 
 import Units from "../pages/student/units/Units";
-// import UnitDetail from "../pages/student/units/UnitDetail"; // optional if you have a unit detail page
 
 const StudentRoutes = () => {
   return (
@@ -33,6 +33,11 @@ const StudentRoutes = () => {
       {/* Bookings */}
       <Route path="bookings" element={<Bookings />} />
       <Route path="bookings/:id" element={<BookingDetail />} />
+      
+      {/* NEW: Payment Approval Route 
+          Matches the navigate(`/student/payment/${bookingId}`) in Bookings.tsx 
+      */}
+      <Route path="payment/:bookingId" element={<PaymentBookingApproval />} />
 
       {/* Leases */}
       <Route path="leases" element={<Leases />} />
@@ -56,7 +61,6 @@ const StudentRoutes = () => {
 
       {/* Units */}
       <Route path="properties/:id/units" element={<Units />} />
-      {/* <Route path="units/:id" element={<UnitDetail />} /> optional */}
     </>
   );
 };

@@ -21,6 +21,12 @@ export const userRoleEnum = pgEnum("user_role", [
   "student"
 ]);
 
+export const paymentStatusEnum = pgEnum("payment_status", [
+  "pending",
+  "paid",
+  "failed"
+]);
+
 export const propertyStatusEnum = pgEnum("property_status", [
   "available",
   "occupied"
@@ -32,10 +38,7 @@ export const bookingStatusEnum = pgEnum("booking_status", [
   "rejected"
 ]);
 
-export const paymentStatusEnum = pgEnum("payment_status", [
-  "pending",
-  "paid"
-]);
+
 
 export const leaseStatusEnum = pgEnum("lease_status", [
   "active",
@@ -100,17 +103,20 @@ export const bookings = pgTable("bookings", {
   createdAt: timestamp("created_at").defaultNow()
 });
 
+
 export const payments = pgTable("payments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  studentId: integer("student_id")
-    .references(() => users.id)
-    .notNull(),
-  bookingId: integer("booking_id")
-    .references(() => bookings.id)
-    .notNull(),
+  studentId: integer("student_id").references(() => users.id).notNull(),
+  bookingId: integer("booking_id").references(() => bookings.id).notNull(),
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   status: paymentStatusEnum("status").default("pending"),
-  reference: varchar("reference", { length: 100 }),
+  
+  // M-Pesa Specific Fields
+  checkoutRequestID: varchar("checkout_request_id", { length: 100 }).unique(), // From STK Push
+  mpesaReceiptNumber: varchar("mpesa_receipt_number", { length: 100 }).unique(), // From Callback
+  phone: varchar("phone", { length: 20 }).notNull(), // The phone that paid
+  
+  reference: varchar("reference", { length: 100 }), 
   createdAt: timestamp("created_at").defaultNow()
 });
 
@@ -150,6 +156,17 @@ export const notifications = pgTable("notifications", {
   isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at").defaultNow()
 });
+
+
+/* ================================
+   TYPES (INFERRED FROM TABLES)
+================================== */
+
+// Type for inserting data (e.g., when creating a new payment)
+export type TPaymentInsert = typeof payments.$inferInsert;
+
+// Type for selecting data (e.g., when fetching payment records)
+export type TPaymentSelect = typeof payments.$inferSelect;
 
 /* ================================
    RELATIONS

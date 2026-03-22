@@ -19,8 +19,13 @@ export interface LoginRequest {
   password: string;
 }
 
+/**
+ * UPDATED: Added userId to match your backend payload 
+ * and your Redux slice expectations.
+ */
 export interface User {
-  id: number;
+  userId: number; // Primary key used in your frontend logic
+  id?: number;    // Optional, in case some endpoints return 'id'
   fullName: string;
   email: string;
   phone?: string;
@@ -37,8 +42,8 @@ export interface AuthResponse {
    REGISTER
 ========================= */
 
-export const registerUser = async (data: RegisterRequest) => {
-  const response = await axiosClient.post("/auth/register", data);
+export const registerUser = async (data: RegisterRequest): Promise<AuthResponse> => {
+  const response = await axiosClient.post<AuthResponse>("/auth/register", data);
   return response.data;
 };
 
@@ -46,7 +51,7 @@ export const registerUser = async (data: RegisterRequest) => {
    LOGIN
 ========================= */
 
-export const loginUser = async (data: LoginRequest) => {
+export const loginUser = async (data: LoginRequest): Promise<AuthResponse> => {
   const response = await axiosClient.post<AuthResponse>("/auth/login", data);
   return response.data;
 };
@@ -57,4 +62,5 @@ export const loginUser = async (data: LoginRequest) => {
 
 export const logoutUser = () => {
   localStorage.removeItem("token");
+  localStorage.removeItem("user");
 };

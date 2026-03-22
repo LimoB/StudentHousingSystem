@@ -16,6 +16,7 @@ import { bookingRouter } from "./bookings/booking.route";
 import { leaseRouter } from "./leases/lease.route";
 import { maintenanceRouter } from "./maintenance/maintenance.route";
 import { notificationRouter } from "./notifications/notification.route";
+import paymentRouter from "./payments/payment.route";
 
 const app: Application = express();
 
@@ -57,7 +58,7 @@ app.use("/api/users", authMiddleware, userRouter);
 app.use("/api/properties", authMiddleware, propertyRouter);
 app.use("/api/units", authMiddleware, unitRouter);
 app.use("/api/bookings", authMiddleware, bookingRouter);
-// app.use("/api/payments", authMiddleware, paymentRouter);
+app.use("/api/payments", authMiddleware,paymentRouter);
 app.use("/api/leases", authMiddleware, leaseRouter);
 app.use("/api/maintenance", authMiddleware, maintenanceRouter);
 app.use("/api/notifications", authMiddleware, notificationRouter);

@@ -31,18 +31,31 @@ export const getLeaseById = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
+//   GET MY LEASES
+//  Standardized to use 'userId' from the Auth Middleware payload.
+ 
 export const getMyLeases = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Assuming your auth middleware attaches 'user' to the request
-    const studentId = (req as any).user?.userId; 
-    if (!studentId) return res.status(401).json({ message: "Unauthorized" });
+    // 1. Use .userId to match your DecodedToken type in authMiddleware
+    // No need for (req as any) because you extended the Request interface!
+    const studentId = req.user?.userId; 
+    
+    if (!studentId) {
+      return res.status(401).json({ 
+        message: "You must be logged in as a student to view your leases" 
+      });
+    }
 
+    // 2. Fetch leases using the validated studentId
     const data = await getStudentLeasesService(studentId);
+
+    // 3. Handle empty vs successful response
     res.status(200).json(data);
   } catch (error) {
     next(error);
   }
 };
+
 
 export const createLease = async (req: Request, res: Response, next: NextFunction) => {
   try {

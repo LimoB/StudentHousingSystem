@@ -5,7 +5,7 @@ import bookingReducer from "./slices/bookingSlice";
 import leaseReducer from "./slices/leaseSlice";
 import maintenanceReducer from "./slices/maintenanceSlice";
 import notificationReducer from "./slices/notificationSlice";
-// import paymentReducer from "./slices/paymentSlice";
+import paymentReducer from "./slices/paymentSlice";
 import propertyReducer from "./slices/propertySlice";
 import unitReducer from "./slices/unitSlice";
 import userReducer from "./slices/userSlice";
@@ -17,7 +17,7 @@ export const store = configureStore({
     leases: leaseReducer,
     maintenance: maintenanceReducer,
     notifications: notificationReducer,
-    // payments: paymentReducer,
+    payments: paymentReducer,
     properties: propertyReducer,
     units: unitReducer,
     users: userReducer,
