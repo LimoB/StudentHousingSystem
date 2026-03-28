@@ -5,13 +5,14 @@ import StudentDashboard from "../pages/student/dashboard/StudentDashboard";
 
 import Bookings from "../pages/student/bookings/Bookings";
 import BookingDetail from "../pages/student/bookings/BookingDetail";
-import PaymentBookingApproval from "../pages/student/bookings/PaymentBookingApproval"; // Import the new payment page
+import PaymentBookingApproval from "../pages/student/bookings/PaymentBookingApproval"; 
 
 import Leases from "../pages/student/leases/Leases";
 import LeaseDetail from "../pages/student/leases/LeaseDetail";
 
 import MaintenanceRequests from "../pages/student/maintenance/MaintenanceRequests";
 import RequestDetail from "../pages/student/maintenance/RequestDetail";
+import CreateRequest from "../pages/student/maintenance/CreateRequest"; // Import the new create page
 
 import Notifications from "../pages/student/notifications/Notifications";
 
@@ -34,9 +35,7 @@ const StudentRoutes = () => {
       <Route path="bookings" element={<Bookings />} />
       <Route path="bookings/:id" element={<BookingDetail />} />
       
-      {/* NEW: Payment Approval Route 
-          Matches the navigate(`/student/payment/${bookingId}`) in Bookings.tsx 
-      */}
+      {/* NEW: Payment Approval Route */}
       <Route path="payment/:bookingId" element={<PaymentBookingApproval />} />
 
       {/* Leases */}
@@ -46,6 +45,8 @@ const StudentRoutes = () => {
       {/* Maintenance */}
       <Route path="maintenance" element={<MaintenanceRequests />} />
       <Route path="maintenance/:id" element={<RequestDetail />} />
+      {/* NEW: Dedicated Create Maintenance Page */}
+      <Route path="maintenance/create" element={<CreateRequest />} />
 
       {/* Notifications */}
       <Route path="notifications" element={<Notifications />} />

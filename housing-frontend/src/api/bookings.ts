@@ -13,7 +13,7 @@ export interface Property {
 export interface Unit {
   id: number;
   unitNumber: string;
-  type: string;
+  unitType?: string; // Added to match your UI usage
   price: number;
   property?: Property;
 }
@@ -22,17 +22,26 @@ export interface Booking {
   id: number;
   studentId: number;
   unitId: number;
-  status: "pending" | "approved" | "rejected";
+  // Updated status to include all possible states from your UI
+  status: "pending" | "approved" | "rejected" | "paid" | "confirmed"; 
+  moveInDate: string; // <--- ADDED THIS TO FIX THE ERROR
   createdAt: string;
-  // Relational data from Drizzle findMany/findFirst
-  student?: any; 
+  updatedAt?: string;
+  // Relational data
+  student?: {
+    id: number;
+    fullName: string;
+    email: string;
+  }; 
   unit?: Unit;
-  payments?: any[];
+  payments?: any[]; // Added for the delete-check logic
 }
 
 export interface CreateBookingPayload {
   unitId: number;
-  // Add other fields if required by your schema
+  studentId?: number;
+  moveInDate: string;
+  status?: string;
 }
 
 /* =========================
@@ -58,7 +67,6 @@ export const getBookingById = async (id: number): Promise<Booking> => {
 };
 
 // CREATE BOOKING
-// Note: Backend returns { message: string, booking: Booking }
 export const createBooking = async (data: CreateBookingPayload): Promise<{ message: string; booking: Booking }> => {
   const res = await axiosClient.post("/bookings", data);
   return res.data;

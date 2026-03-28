@@ -58,7 +58,7 @@ app.use("/api/users", authMiddleware, userRouter);
 app.use("/api/properties", authMiddleware, propertyRouter);
 app.use("/api/units", authMiddleware, unitRouter);
 app.use("/api/bookings", authMiddleware, bookingRouter);
-app.use("/api/payments", authMiddleware,paymentRouter);
+app.use("/api/payments", paymentRouter);// authMiddleware,
 app.use("/api/leases", authMiddleware, leaseRouter);
 app.use("/api/maintenance", authMiddleware, maintenanceRouter);
 app.use("/api/notifications", authMiddleware, notificationRouter);

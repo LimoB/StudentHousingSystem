@@ -3,8 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchLeaseById } from "../../../app/slices/leaseSlice";
 import type { RootState, AppDispatch } from "../../../app/store";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { 
   ChevronLeft, 
   MapPin, 
@@ -12,7 +10,6 @@ import {
   Calendar, 
   Key, 
   Info,
-  Download,
   CheckCircle2
 } from "lucide-react";
 
@@ -30,63 +27,6 @@ const LeaseDetail: React.FC = () => {
       dispatch(fetchLeaseById(Number(id)));
     }
   }, [dispatch, id]);
-
-  /**
-   * PDF GENERATOR
-   * Reusing the logic from the list view for consistency
-   */
-  const handleDownloadPDF = () => {
-    if (!selectedLease) return;
-
-    const doc = new jsPDF();
-    const dateStr = new Date().toLocaleDateString('en-GB');
-
-    // Header Accent
-    doc.setFillColor(31, 41, 55); // Gray-900 to match the Detail UI
-    doc.rect(0, 0, 210, 45, 'F');
-    
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.setFont("helvetica", "bold");
-    doc.text("OFFICIAL LEASE AGREEMENT", 20, 25);
-    
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Reference: LSE-${selectedLease.id.toString().padStart(8, '0')}`, 20, 35);
-    doc.text(`Issue Date: ${dateStr}`, 160, 35);
-
-    // Section Title
-    doc.setTextColor(40, 40, 40);
-    doc.setFontSize(16);
-    doc.text("Agreement Summary", 20, 60);
-
-    // Data Table
-    autoTable(doc, {
-      startY: 65,
-      head: [['Category', 'Details']],
-      body: [
-        ['Property Name', selectedLease.unit?.property?.name || 'N/A'],
-        ['Location', selectedLease.unit?.property?.location || 'N/A'],
-        ['Unit Number', selectedLease.unit?.unitNumber || 'N/A'],
-        ['Room Type', selectedLease.unit?.type?.toUpperCase() || 'STANDARD'],
-        ['Tenant Name', user?.fullName || 'N/A'],
-        ['Start Date', new Date(selectedLease.startDate).toLocaleDateString('en-GB', { dateStyle: 'long' })],
-        ['End Date', selectedLease.endDate ? new Date(selectedLease.endDate).toLocaleDateString('en-GB', { dateStyle: 'long' }) : 'Ongoing'],
-        ['Rent Amount', `Ksh ${Number(selectedLease.unit?.price || 0).toLocaleString()}`],
-      ],
-      headStyles: { fillColor: [31, 41, 55] },
-      styles: { cellPadding: 5 },
-    });
-
-    // Footer
-    const finalY = (doc as any).lastAutoTable.finalY || 150;
-    doc.setFontSize(9);
-    doc.setTextColor(150, 150, 150);
-    doc.text("This document is a computer-generated summary of your digital lease agreement.", 20, finalY + 20);
-    doc.text("It is valid without a physical signature as per the Digital Housing Terms of Service.", 20, finalY + 25);
-
-    doc.save(`Lease_${selectedLease.unit?.unitNumber}_Agreement.pdf`);
-  };
 
   // Security Check: Ensure the lease belongs to the current user
   const isOwner = selectedLease && Number(selectedLease.studentId) === Number(currentUserId);
@@ -140,12 +80,7 @@ const LeaseDetail: React.FC = () => {
               </div>
             </div>
             
-            <button 
-              onClick={handleDownloadPDF}
-              className="bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-3 hover:bg-blue-700 transition"
-            >
-              <Download size={20} /> PDF Copy
-            </button>
+            {/* PDF Button Removed from here */}
           </div>
         </div>
 

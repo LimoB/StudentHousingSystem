@@ -90,6 +90,12 @@ const unitSlice = createSlice({
   reducers: {
     clearUnitError: (state) => {
       state.error = null;
+    },
+    // Action to clear units when navigating away or switching views
+    resetUnits: (state) => {
+      state.units = [];
+      state.loading = false;
+      state.error = null;
     }
   },
   extraReducers: (builder) => {
@@ -101,7 +107,7 @@ const unitSlice = createSlice({
       })
       .addCase(fetchUnits.fulfilled, (state, action) => {
         state.loading = false;
-        state.units = action.payload;
+        state.units = Array.isArray(action.payload) ? action.payload : [];
       })
       .addCase(fetchUnits.rejected, (state, action) => {
         state.loading = false;
@@ -115,7 +121,15 @@ const unitSlice = createSlice({
       })
       .addCase(fetchUnitsByProperty.fulfilled, (state, action) => {
         state.loading = false;
-        state.units = action.payload;
+        const incomingUnits = Array.isArray(action.payload) ? action.payload : [];
+        
+        // Filter out existing units that belong to the SAME property we just fetched 
+        // to avoid duplicates, while keeping units from other properties if needed.
+        const otherUnits = state.units.filter(
+          (existing) => !incomingUnits.some((incoming) => incoming.id === existing.id)
+        );
+        
+        state.units = [...otherUnits, ...incomingUnits];
       })
       .addCase(fetchUnitsByProperty.rejected, (state, action) => {
         state.loading = false;
@@ -123,40 +137,30 @@ const unitSlice = createSlice({
       })
 
       /* CREATE */
-      .addCase(createUnitAction.pending, (state) => {
-        state.loading = true;
-      })
       .addCase(createUnitAction.fulfilled, (state, action) => {
         state.loading = false;
-        // Adjusting based on common API response structures
         const newUnit = action.payload.unit || action.payload;
-        state.units.push(newUnit);
-      })
-      .addCase(createUnitAction.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
+        if (newUnit) state.units.push(newUnit);
       })
 
       /* UPDATE */
       .addCase(updateUnitAction.fulfilled, (state, action) => {
         state.loading = false;
         const updatedUnit = action.payload.unit || action.payload;
-        state.units = state.units.map((u) =>
-          u.id === updatedUnit.id ? updatedUnit : u
-        );
+        if (updatedUnit) {
+            state.units = state.units.map((u) =>
+                u.id === updatedUnit.id ? updatedUnit : u
+            );
+        }
       })
 
       /* DELETE */
       .addCase(deleteUnitAction.fulfilled, (state, action) => {
         state.loading = false;
         state.units = state.units.filter((u) => u.id !== action.payload);
-      })
-      .addCase(deleteUnitAction.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
       });
   },
 });
 
-export const { clearUnitError } = unitSlice.actions;
+export const { clearUnitError, resetUnits } = unitSlice.actions;
 export default unitSlice.reducer;

@@ -1,133 +1,136 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { Link, useLocation } from "react-router-dom";
+import toast from "react-hot-toast"; // Import toast
 import {
-  fetchMaintenanceRequests,
   fetchMyMaintenanceRequests,
   deleteMaintenanceRequestAction,
-  updateMaintenanceStatusAction,
-  createMaintenanceRequestAction,
 } from "../../../app/slices/maintenanceSlice";
-import type { RootState, AppDispatch } from "../../../app/store";
-import type { MaintenanceRequest } from "../../../api/maintenance";
+import { fetchMyLeases } from "../../../app/slices/leaseSlice";
+import { RootState, AppDispatch } from "../../../app/store";
+import { 
+  Wrench, 
+  Plus, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle, 
+  ChevronRight, 
+  Trash2 
+} from "lucide-react";
 
 const MaintenanceRequests: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [description, setDescription] = useState("");
+  const location = useLocation(); // To detect if we just came from "Create" page
+  
+  const { requests, loading } = useSelector((state: RootState) => state.maintenance);
+  const { leases } = useSelector((state: RootState) => state.leases);
 
-  const { requests, loading, error } = useSelector((state: RootState) => state.maintenance);
-  const user = useSelector((state: RootState) => state.auth.user);
-  const { leases } = useSelector((state: RootState) => state.leases); // To get the student's unit
+  // Check for active lease to allow reporting
+  const activeLease = useMemo(() => 
+    leases.find(l => l.status === 'active'), 
+  [leases]);
 
   useEffect(() => {
-    if (user?.role === "student") {
-      dispatch(fetchMyMaintenanceRequests());
-    } else {
-      dispatch(fetchMaintenanceRequests());
+    dispatch(fetchMyMaintenanceRequests());
+    dispatch(fetchMyLeases());
+
+    // Show success toast if redirected from Create page with a success state
+    if (location.state?.submitted) {
+      toast.success("Maintenance ticket submitted successfully!", {
+        duration: 4000,
+        position: "top-center",
+        style: { borderRadius: '1rem', background: '#111827', color: '#fff' }
+      });
     }
-  }, [dispatch, user]);
+  }, [dispatch, location]);
 
-  const handleCreateRequest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!description || !leases[0]?.unitId) return;
-
-    await dispatch(createMaintenanceRequestAction({
-      unitId: leases[0].unitId,
-      description
-    })).unwrap();
-    
-    setIsModalOpen(false);
-    setDescription("");
-  };
-
-  const handleDelete = (id: number) => {
-    if (window.confirm("Cancel this request?")) {
-      dispatch(deleteMaintenanceRequestAction(id));
+  const handleDelete = async (id: number) => {
+    if (window.confirm("Are you sure you want to cancel this request?")) {
+      try {
+        await dispatch(deleteMaintenanceRequestAction(id)).unwrap();
+        toast.success("Request cancelled");
+      } catch (err) {
+        toast.error("Failed to cancel request");
+      }
     }
   };
 
-  if (loading) return <div className="p-10 text-center animate-pulse text-blue-600 font-bold">Updating records...</div>;
+  if (loading) return (
+    <div className="p-20 text-center flex flex-col items-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-600 mb-4"></div>
+      <p className="text-gray-500 font-bold tracking-tight">Updating your records...</p>
+    </div>
+  );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto min-h-screen">
-      <div className="flex justify-between items-center mb-10">
+    <div className="p-6 max-w-5xl mx-auto min-h-screen">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-900">Maintenance</h1>
-          <p className="text-gray-500">Report issues and track repairs.</p>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Maintenance</h1>
+          <p className="text-gray-500 font-medium mt-1">Report and track repairs for your unit.</p>
         </div>
         
-        {user?.role === "student" && (
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-100 flex items-center gap-2"
+        {activeLease ? (
+          <Link 
+            to="/student/maintenance/create" 
+            className="px-6 py-4 bg-blue-600 text-white rounded-[1.5rem] font-bold hover:bg-blue-700 transition shadow-xl shadow-blue-100 flex items-center gap-2"
           >
-            <span>+</span> Report New Issue
-          </button>
+            <Plus size={20} /> Report New Issue
+          </Link>
+        ) : (
+          <div className="bg-orange-50 text-orange-600 px-4 py-2 rounded-xl text-xs font-bold border border-orange-100 flex items-center gap-2">
+            <AlertCircle size={14} /> Active lease required to report issues
+          </div>
         )}
       </div>
 
-      {/* Modal for reporting issue */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl">
-            <h2 className="text-2xl font-bold mb-4 text-gray-800">New Service Request</h2>
-            <form onSubmit={handleCreateRequest}>
-              <textarea 
-                className="w-full p-4 border-2 border-gray-100 rounded-2xl focus:border-blue-500 outline-none h-40 transition-all mb-6"
-                placeholder="Describe the issue (e.g., The kitchen sink is leaking...)"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                required
-              />
-              <div className="flex gap-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 text-gray-500 font-bold">Cancel</button>
-                <button type="submit" className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold">Submit Request</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {requests.length === 0 ? (
-        <div className="bg-white p-16 rounded-[2.5rem] text-center border-2 border-dashed border-gray-100">
-          <p className="text-gray-400 font-medium">No active maintenance issues found.</p>
+        <div className="bg-white p-20 rounded-[3rem] text-center border-2 border-dashed border-gray-100">
+          <Wrench size={48} className="mx-auto text-gray-200 mb-4" />
+          <p className="text-gray-400 font-bold text-lg">Your repair history is empty.</p>
         </div>
       ) : (
-        <div className="grid gap-6">
-          {requests.map((req) => (
-            <div key={req.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between gap-6">
+        <div className="grid gap-4">
+          {[...requests].reverse().map((req) => ( // Reverse to show newest first
+            <div key={req.id} className="bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between gap-6 group hover:border-blue-200 transition-all">
               <div className="flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                     req.status === 'completed' ? 'bg-green-100 text-green-700' :
                     req.status === 'in-progress' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'
                   }`}>
-                    {req.status}
+                    {req.status === 'completed' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
+                    {req.status || 'Pending'}
+                  </div>
+                  
+                  <span className="text-xs text-gray-400 font-bold font-mono">
+                    #{req.id?.toString().padStart(4, '0') || '----'}
                   </span>
-                  <span className="text-xs text-gray-400">ID: #{req.id}</span>
                 </div>
-                <p className="text-gray-700 font-medium leading-relaxed">{req.description}</p>
+                <p className="text-gray-700 font-bold text-lg leading-snug line-clamp-2 italic tracking-tight">
+                  "{req.description}"
+                </p>
+                
+                <p className="text-gray-400 text-[10px] mt-3 font-black uppercase tracking-widest">
+                   Logged: {req.createdAt ? new Date(req.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric'}) : 'Just now'}
+                </p>
               </div>
 
               <div className="flex items-center gap-4">
-                {user?.role === "student" && req.status === "pending" && (
+                <Link 
+                  to={`/student/maintenance/${req.id}`}
+                  className="bg-gray-50 text-gray-900 hover:bg-gray-900 hover:text-white px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all"
+                >
+                  View Details <ChevronRight size={16} />
+                </Link>
+                {req.status === "pending" && (
                   <button 
                     onClick={() => handleDelete(req.id)}
-                    className="text-red-400 hover:text-red-600 text-sm font-bold"
+                    className="p-3 text-red-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                    title="Cancel Request"
                   >
-                    Cancel Request
+                    <Trash2 size={20} />
                   </button>
-                )}
-                {user?.role !== "student" && (
-                   <select 
-                    value={req.status}
-                    onChange={(e) => dispatch(updateMaintenanceStatusAction({ id: req.id, status: e.target.value }))}
-                    className="bg-gray-50 border-none rounded-xl text-sm font-bold p-2 outline-none"
-                   >
-                     <option value="pending">Pending</option>
-                     <option value="in-progress">In Progress</option>
-                     <option value="completed">Completed</option>
-                   </select>
                 )}
               </div>
             </div>

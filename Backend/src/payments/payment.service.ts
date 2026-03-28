@@ -1,7 +1,7 @@
 import axios from "axios";
 import dotenv from "dotenv";
 import db from "../drizzle/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { 
   payments, 
   bookings,
@@ -33,9 +33,8 @@ export const getAccessToken = async (): Promise<string> => {
   );
   return response.data.access_token;
 };
-
 export const initiateSTKPushService = async (phone: string, amount: number, bookingId: number, studentId: number) => {
-  // PRE-CHECK: Ensure unit is still available before requesting money
+  // 1. PRE-CHECK: Ensure unit is still available before requesting money
   const bookingCheck = await db.query.bookings.findFirst({
     where: eq(bookings.id, bookingId),
     with: { unit: true }
@@ -44,6 +43,17 @@ export const initiateSTKPushService = async (phone: string, amount: number, book
   if (!bookingCheck || !bookingCheck.unit?.isAvailable) {
     throw new Error("This unit is no longer available.");
   }
+
+  // 2. CLEANUP: Remove any existing 'pending' payments for this specific booking
+  // This prevents multiple 'pending' rows (zombies) if the user clicks pay multiple times.
+  // Make sure to import 'and' from "drizzle-orm" at the top of your file.
+  await db.delete(payments)
+    .where(
+      and(
+        eq(payments.bookingId, bookingId),
+        eq(payments.status, "pending")
+      )
+    );
 
   const accessToken = await getAccessToken();
   const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, "").slice(0, 14);
@@ -70,6 +80,7 @@ export const initiateSTKPushService = async (phone: string, amount: number, book
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
 
+  // 3. INSERT: Store the fresh pending payment session
   await db.insert(payments).values({
     studentId,
     bookingId,
@@ -82,6 +93,7 @@ export const initiateSTKPushService = async (phone: string, amount: number, book
 
   return response.data;
 };
+
 
 /**
  * UPDATED: Instant Fulfillment Logic

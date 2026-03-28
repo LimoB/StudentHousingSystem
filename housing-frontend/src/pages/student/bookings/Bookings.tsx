@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   fetchBookings,
   fetchMyBookings,
@@ -8,6 +9,17 @@ import {
 } from "../../../app/slices/bookingSlice";
 
 import type { RootState, AppDispatch } from "../../../app/store";
+import { 
+  Calendar, 
+  Trash2, 
+  CreditCard, 
+  ChevronRight, 
+  Loader2, 
+  AlertCircle,
+  ShieldCheck,
+  Building2,
+  Clock
+} from "lucide-react";
 
 const Bookings: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -24,106 +36,151 @@ const Bookings: React.FC = () => {
     }
   }, [dispatch, user]);
 
-  const handleDelete = (booking: any) => {
-    // Check if the booking has payments (common cause of 500 delete errors)
+  const handleDelete = async (e: React.MouseEvent, booking: any) => {
+    e.stopPropagation(); // Prevents navigating to details when clicking delete
+    
     if (booking.payments?.length > 0) {
-        alert("This booking has associated payment records and cannot be deleted. Contact support to cancel.");
+        toast.error("This booking has active payments and cannot be deleted.", {
+            style: { borderRadius: '1rem', background: '#1f2937', color: '#fff' }
+        });
         return;
     }
 
     if (window.confirm("Are you sure you want to cancel this booking?")) {
-      dispatch(deleteBookingAction(booking.id));
+      const loadId = toast.loading("Cancelling booking...");
+      try {
+        await dispatch(deleteBookingAction(booking.id)).unwrap();
+        toast.success("Booking cancelled successfully", { id: loadId });
+      } catch (err: any) {
+        toast.error(err || "Failed to cancel booking", { id: loadId });
+      }
     }
   };
 
-  const handlePayment = (bookingId: number) => {
+  const handlePayment = (e: React.MouseEvent, bookingId: number) => {
+    e.stopPropagation(); // Prevents navigating to details when clicking pay
     navigate(`/student/payment/${bookingId}`);
   };
 
-  if (loading) return (
-    <div className="p-10 text-center">
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto"></div>
-      <p className="mt-4 text-gray-500 font-bold">Refreshing bookings...</p>
-    </div>
-  );
+  const handleNavigateToDetails = (bookingId: number) => {
+    navigate(`/student/bookings/${bookingId}`);
+  };
 
-  if (error) return (
-    <div className="p-10 text-center">
-        <p className="text-red-500 font-bold mb-4">{error}</p>
-        <button onClick={() => window.location.reload()} className="text-blue-600 underline">Try again</button>
+  if (loading) return (
+    <div className="flex flex-col justify-center items-center min-h-screen bg-[#F8FAFC]">
+      <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
+      <p className="text-slate-400 font-medium animate-pulse">Syncing your records...</p>
     </div>
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto min-h-screen">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-black text-gray-900">
-          {user?.role === "student" ? "My Bookings" : "Property Bookings"}
-        </h1>
-        <span className="bg-blue-50 text-blue-700 px-4 py-1 rounded-full text-sm font-bold border border-blue-100">
-          {bookings.length} Total
-        </span>
-      </div>
-
-      {bookings.length === 0 ? (
-        <div className="bg-white p-12 rounded-3xl text-center border-2 border-dashed border-gray-100">
-          <p className="text-gray-400 text-lg">No bookings found in your history.</p>
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {bookings.map((booking: any) => (
-            <div 
-              key={booking.id} 
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:shadow-md transition-shadow"
-            >
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xl font-bold text-gray-900">
-                    {booking.unit?.property?.name || "Apartment Unit"}
-                  </h3>
-                  <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter ${
-                    booking.status === 'approved' ? 'bg-green-100 text-green-700' :
-                    booking.status === 'pending' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'
-                  }`}>
-                    {booking.status}
-                  </span>
-                </div>
-                <p className="text-gray-500 font-medium">
-                  Room: <span className="text-gray-900 font-bold">{booking.unit?.unitNumber || "N/A"}</span>
-                </p>
-                <p className="text-blue-600 font-black mt-1">
-                  Ksh {Number(booking.unit?.price || 0).toLocaleString()}
-                </p>
-              </div>
-
-              <div className="text-sm text-gray-400">
-                <p>Booked on:</p>
-                <p className="font-bold text-gray-600">
-                  {new Date(booking.createdAt).toLocaleDateString('en-GB')}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {user?.role === "student" && booking.status === "pending" && (
-                  <button
-                    onClick={() => handlePayment(booking.id)}
-                    className="px-6 py-2 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-100"
-                  >
-                    Pay to Approve
-                  </button>
-                )}
-
-                <button
-                  onClick={() => handleDelete(booking)}
-                  className="px-4 py-2 text-red-500 hover:bg-red-50 rounded-xl transition text-sm font-semibold"
-                >
-                  Cancel
-                </button>
-              </div>
+    <div className="p-6 md:p-12 bg-[#F8FAFC] min-h-screen">
+      <div className="max-w-6xl mx-auto">
+        
+        {/* Header Section */}
+        <header className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-[10px] font-bold tracking-widest uppercase border border-blue-100 mb-4">
+              <ShieldCheck size={12} /> Management Portal
             </div>
-          ))}
-        </div>
-      )}
+            <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
+              {user?.role === "student" ? "My" : "All"} <span className="text-blue-600">Bookings.</span>
+            </h1>
+            <p className="text-slate-500 font-medium mt-2 italic">
+              Review unit reservations and lease statuses.
+            </p>
+          </div>
+          
+          <div className="bg-white px-6 py-4 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4">
+            <div className="bg-blue-50 p-2 rounded-xl text-blue-600">
+               <Calendar size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Total</p>
+              <p className="text-xl font-black text-slate-900">{bookings.length}</p>
+            </div>
+          </div>
+        </header>
+
+        {bookings.length === 0 ? (
+          <div className="bg-white p-20 rounded-[3rem] text-center border border-slate-100 shadow-sm">
+            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Building2 className="text-slate-200" size={40} />
+            </div>
+            <p className="text-slate-400 font-bold text-lg tracking-tight">No booking history found.</p>
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {[...bookings].reverse().map((booking: any) => (
+              <div 
+                key={booking.id} 
+                onClick={() => handleNavigateToDetails(booking.id)}
+                className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-8 flex flex-col md:flex-row md:items-center justify-between gap-8 hover:border-blue-300 transition-all group relative overflow-hidden cursor-pointer"
+              >
+                {/* Visual Accent */}
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                <div className="flex-1 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                      {booking.unit?.property?.name || "Premium Residence"}
+                    </h3>
+                    <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                      booking.status === 'paid' || booking.status === 'confirmed' 
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                        : 'bg-orange-50 text-orange-600 border-orange-100'
+                    }`}>
+                      {booking.status}
+                    </span>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-y-3 gap-x-8">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Unit</span>
+                        <span className="text-slate-700 font-bold">{booking.unit?.unitNumber || "N/A"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Rent</span>
+                        <span className="text-blue-600 font-black">Ksh {Number(booking.unit?.price || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock size={14} className="text-slate-300" />
+                        <span className="text-slate-400 text-[11px] font-bold uppercase tracking-tighter">
+                          {booking.createdAt ? new Date(booking.createdAt).toLocaleDateString('en-GB') : 'Date Pending'}
+                        </span>
+                      </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  {/* Payment Button */}
+                  {user?.role === "student" && (booking.status === "pending" || booking.status === "approved") && !booking.payments?.length && (
+                    <button
+                      onClick={(e) => handlePayment(e, booking.id)}
+                      className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-blue-600 transition-all shadow-lg shadow-slate-200 flex items-center gap-2 active:scale-95"
+                    >
+                      <CreditCard size={18} /> Pay Now
+                    </button>
+                  )}
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => handleDelete(e, booking)}
+                    className="p-4 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                  
+                  {/* Clickable Detail Chevron */}
+                  <div className="hidden md:flex p-2 text-slate-200 group-hover:text-blue-500 group-hover:translate-x-1 transition-all">
+                      <ChevronRight size={28} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

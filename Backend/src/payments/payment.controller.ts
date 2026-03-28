@@ -4,6 +4,9 @@ import * as PaymentService from "./payment.service";
 /**
  * 1. M-PESA: INITIATE STK PUSH
  */
+/**
+ * 1. M-PESA: INITIATE STK PUSH
+ */
 export const collectPayment = async (req: Request, res: Response, next: NextFunction) => {
   // LOG THE INCOMING PAYLOAD
   console.log("--- STK PUSH REQUEST ---");
@@ -18,14 +21,32 @@ export const collectPayment = async (req: Request, res: Response, next: NextFunc
   }
   
   try {
+    // This call now internally handles deleting old 'pending' records 
+    // before creating the new one in the database.
     const result = await PaymentService.initiateSTKPushService(phone, amount, bookingId, studentId);
+    
     console.log("STK Push Success Response:", result);
-    res.status(200).json({ message: "STK Push initiated successfully", data: result });
+
+    // Return the CheckoutRequestID directly so the frontend can 
+    // immediately start polling /api/payments/status/:id
+    res.status(200).json({ 
+      message: "STK Push initiated successfully. Please check your phone.", 
+      checkoutRequestID: result.CheckoutRequestID, // Helper for frontend polling
+      data: result 
+    });
   } catch (error: any) {
     console.error("STK Push Service Error:", error.message);
+    
+    // Check for specific error messages from the service (like 'Unit unavailable')
+    if (error.message.includes("no longer available")) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    
     next(error);
   }
 };
+
 
 /**
  * 2. M-PESA: CALLBACK HANDLER (Public)
