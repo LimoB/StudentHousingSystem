@@ -169,6 +169,14 @@ export type TPaymentInsert = typeof payments.$inferInsert;
 export type TPaymentSelect = typeof payments.$inferSelect;
 
 /* ================================
+   TYPES (INFERRED FROM TABLES)
+================================== */
+
+// Add this line
+export type TLeaseInsert = typeof leases.$inferInsert;
+export type TLeaseSelect = typeof leases.$inferSelect;
+
+/* ================================
    RELATIONS
 ================================== */
 

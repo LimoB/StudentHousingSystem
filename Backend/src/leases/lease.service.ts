@@ -1,11 +1,67 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import db from "../drizzle/db";
-import { leases, units } from "../drizzle/schema";
+import { 
+  leases, 
+  units, 
+  properties, 
+  users, 
+  TLeaseInsert 
+} from "../drizzle/schema";
 
-export type TLeaseInsert = typeof leases.$inferInsert;
+// Helper for type-broken environments
+const l = leases as any;
+const u = units as any;
+const p = properties as any;
+const s = users as any;
 
 /* ================================
-   GET ALL LEASES (With Relations)
+   GET LANDLORD LEASES (Secure & Fixed)
+================================ */
+export const getLandlordLeasesService = async (landlordId: number) => {
+  const result = await db
+    .select({
+      id: l.id,
+      startDate: l.startDate,
+      endDate: l.endDate,
+      status: l.status,
+      createdAt: l.createdAt,
+      studentName: s.fullName,
+      studentEmail: s.email,
+      studentPhone: s.phone,
+      unitNumber: u.unitNumber,
+      propertyName: p.name,
+      location: p.location,
+    })
+    .from(l)
+    .innerJoin(s, eq(l.studentId, s.id))
+    .innerJoin(u, eq(l.unitId, u.id))
+    .innerJoin(p, eq(u.propertyId, p.id))
+    .where(eq(p.landlordId, landlordId));
+
+  // Map back to the nested structure for the frontend
+  return result.map((row) => ({
+    id: row.id,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    status: row.status,
+    createdAt: row.createdAt,
+    student: {
+      fullName: row.studentName,
+      email: row.studentEmail,
+      phone: row.studentPhone,
+    },
+    unit: {
+      unitNumber: row.unitNumber,
+      property: {
+        name: row.propertyName,
+        location: row.location,
+      },
+    },
+  }));
+};
+
+/* ================================
+   GET ALL LEASES (Admin View)
 ================================ */
 export const getLeasesService = async () => {
   return await db.query.leases.findMany({
@@ -33,33 +89,7 @@ export const getStudentLeasesService = async (studentId: number) => {
 };
 
 /* ================================
-   END LEASE (Updated with Unit Release)
-================================ */
-export const endLeaseService = async (leaseId: number) => {
-  return await db.transaction(async (tx) => {
-    // 1. Update lease status
-    const [updatedLease] = await tx
-      .update(leases)
-      .set({ status: "ended" })
-      .where(eq(leases.id, leaseId))
-      .returning();
-
-    if (!updatedLease) throw new Error("Lease not found");
-
-    // 2. IMPORTANT: Make the unit available for booking again!
-    await tx
-      .update(units)
-      .set({ isAvailable: true })
-      .where(eq(units.id, updatedLease.unitId));
-
-    return "Lease ended and unit is now available";
-  });
-};
-
-// ... keep your getLeaseById and deleteLease as they were
-
-/* ================================
-   GET LEASE BY ID (With Relations)
+   GET LEASE BY ID
 ================================ */
 export const getLeaseByIdService = async (leaseId: number) => {
   return await db.query.leases.findFirst({
@@ -74,20 +104,6 @@ export const getLeaseByIdService = async (leaseId: number) => {
 };
 
 /* ================================
-   GET STUDENT LEASES
-================================ */
-// export const getStudentLeasesService = async (studentId: number) => {
-//   return await db.query.leases.findMany({
-//     where: eq(leases.studentId, studentId),
-//     with: {
-//       unit: {
-//         with: { property: { columns: { name: true, location: true } } }
-//       }
-//     }
-//   });
-// };
-
-/* ================================
    CREATE LEASE
 ================================ */
 export const createLeaseService = async (lease: TLeaseInsert) => {
@@ -96,18 +112,28 @@ export const createLeaseService = async (lease: TLeaseInsert) => {
 };
 
 /* ================================
-   END LEASE
+   END LEASE (Updated with Unit Release)
 ================================ */
-// export const endLeaseService = async (leaseId: number) => {
-//   const result = await db
-//     .update(leases)
-//     .set({ status: "ended" })
-//     .where(eq(leases.id, leaseId))
-//     .returning();
+export const endLeaseService = async (leaseId: number) => {
+  return await db.transaction(async (tx) => {
+    // 1. Update lease status
+    const [updatedLease] = await (tx as any)
+      .update(leases)
+      .set({ status: "ended" })
+      .where(eq(leases.id, leaseId))
+      .returning();
 
-//   if (!result.length) throw new Error("Lease not found");
-//   return "Lease ended successfully";
-// };
+    if (!updatedLease) throw new Error("Lease not found");
+
+    // 2. Make the unit available for booking again
+    await (tx as any)
+      .update(units)
+      .set({ isAvailable: true })
+      .where(eq(units.id, updatedLease.unitId));
+
+    return "Lease ended and unit is now available";
+  });
+};
 
 /* ================================
    DELETE LEASE

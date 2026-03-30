@@ -114,32 +114,42 @@ export const checkPaymentStatus = async (req: Request, res: Response, next: Next
 
 export const getPayments = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
+    // 1. Get user from request (populated by authMiddleware)
+    const user = req.user; 
     
-    // 1. CRITICAL: Force the ID to be a Number
-    const userId = Number(user?.id || user?.userId);
-    const userRole = user?.role;
+    if (!user) {
+      console.error("[ERROR] getPayments called without authenticated user");
+      return res.status(401).json({ error: "Unauthorized: No user found in request" });
+    }
 
-    console.log(`[GetPayments] User: ${userId} | Role: ${userRole}`);
+    // 2. Align with your DecodedToken type (userId)
+    const currentUserId = Number(user.userId);
+    const userRole = user.role?.toLowerCase();
+
+    console.log(`[DEBUG] Fetching payments for Role: ${userRole}, ID: ${currentUserId}`);
 
     let data;
 
+    // 3. Logic Branching
     if (userRole === "landlord") {
-      // 2. Logic for landlord: 
-      // First arg (studentId) = undefined
-      // Second arg (landlordId) = userId
-      data = await PaymentService.getAllPaymentsService(undefined, userId);
+      // Landlords only see payments for their properties
+      data = await PaymentService.getAllPaymentsService(undefined, currentUserId);
     } else if (userRole === "student") {
-      // Logic for student: 1st arg is studentId
-      data = await PaymentService.getAllPaymentsService(userId);
-    } else {
-      // Admin: Get everything
+      // Students only see their own payments
+      data = await PaymentService.getAllPaymentsService(currentUserId);
+    } else if (userRole === "admin") {
+      // Admins see everything
       data = await PaymentService.getAllPaymentsService();
+    } else {
+      return res.status(403).json({ error: "Forbidden: Invalid role" });
     }
     
+    // 4. Final response
+    console.log(`[SUCCESS] Returning ${data?.length || 0} payment records.`);
     res.status(200).json(data);
+
   } catch (error) {
-    console.error("Error in getPayments controller:", error);
+    console.error("[CONTROLLER ERROR] getPayments:", error);
     next(error);
   }
 };

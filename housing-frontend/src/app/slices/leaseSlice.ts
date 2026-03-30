@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction, Action } from "@reduxjs/t
 import {
   getLeases,
   getMyLeases,
+  getLandlordLeases, // Added this import
   getLeaseById,
   createLease,
   deleteLease,
@@ -35,6 +36,7 @@ const initialState: LeaseState = {
    THUNKS
 ========================= */
 
+// 1. ADMIN: Fetch all
 export const fetchLeases = createAsyncThunk(
   "leases/fetchLeases",
   async (_, thunkAPI) => {
@@ -46,6 +48,19 @@ export const fetchLeases = createAsyncThunk(
   }
 );
 
+// 2. LANDLORD: Fetch only owned property leases
+export const fetchLandlordLeases = createAsyncThunk(
+  "leases/fetchLandlordLeases",
+  async (_, thunkAPI) => {
+    try {
+      return await getLandlordLeases();
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch landlord leases");
+    }
+  }
+);
+
+// 3. STUDENT: Fetch personal
 export const fetchMyLeases = createAsyncThunk(
   "leases/fetchMyLeases",
   async (_, thunkAPI) => {
@@ -73,7 +88,7 @@ export const createLeaseAction = createAsyncThunk(
   async (payload: CreateLeasePayload, thunkAPI) => {
     try {
       const response = await createLease(payload);
-      return response.lease; // Return only the lease object
+      return response.lease; 
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to create lease");
     }
@@ -85,7 +100,7 @@ export const endLeaseAction = createAsyncThunk(
   async (id: number, thunkAPI) => {
     try {
       await endLease(id);
-      return id; // Return ID to update local state
+      return id; 
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to end lease");
     }
@@ -119,14 +134,16 @@ const leaseSlice = createSlice({
 
   extraReducers: (builder) => {
     builder
-      /* 1. SPECIFIC CASES */
-
-      // FETCH ALL / MY LEASES
+      // FETCH ALL / MY / LANDLORD LEASES
       .addCase(fetchLeases.fulfilled, (state, action: PayloadAction<Lease[]>) => {
         state.loading = false;
         state.leases = action.payload;
       })
       .addCase(fetchMyLeases.fulfilled, (state, action: PayloadAction<Lease[]>) => {
+        state.loading = false;
+        state.leases = action.payload;
+      })
+      .addCase(fetchLandlordLeases.fulfilled, (state, action: PayloadAction<Lease[]>) => {
         state.loading = false;
         state.leases = action.payload;
       })
@@ -143,7 +160,7 @@ const leaseSlice = createSlice({
         state.leases.unshift(action.payload);
       })
 
-      // END LEASE
+      // END LEASE (State Update)
       .addCase(endLeaseAction.fulfilled, (state, action: PayloadAction<number>) => {
         state.loading = false;
         const id = action.payload;
@@ -167,8 +184,7 @@ const leaseSlice = createSlice({
         }
       })
 
-      /* 2. MATCHERS (Ordering matters!) */
-
+      /* MATCHERS */
       .addMatcher(
         (action): action is Action => action.type.endsWith("/pending"),
         (state) => {

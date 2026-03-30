@@ -5,7 +5,6 @@ import {
   FaMoneyBillWave,
   FaTools,
   FaUsers,
-  FaFileAlt,
   FaBuilding,
   FaBell,
   FaFileContract,

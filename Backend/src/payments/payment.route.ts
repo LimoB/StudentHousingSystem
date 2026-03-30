@@ -1,5 +1,10 @@
 import { Router } from "express";
 import { 
+  authMiddleware, 
+  allUsers, 
+  adminOrLandlord 
+} from "../middleware/authMiddleware"; // <--- Adjust this path to your middleware file
+import { 
   collectPayment, 
   mpesaCallback, 
   checkPaymentStatus,
@@ -11,15 +16,22 @@ import {
 
 const paymentRouter = Router();
 
-// --- M-PESA ENDPOINTS ---
-paymentRouter.post("/stkpush", collectPayment);
+// --- PUBLIC/SEMIPUBLIC ENDPOINTS ---
+// Callback must stay public (no middleware) so Safaricom can hit it
 paymentRouter.post("/callback", mpesaCallback); 
-paymentRouter.get("/status/:checkoutRequestID", checkPaymentStatus); 
 
-// --- CRUD ENDPOINTS ---
-paymentRouter.get("/", getPayments);
-paymentRouter.get("/:id", getPaymentById);
-paymentRouter.patch("/:id", updatePayment);
-paymentRouter.delete("/:id", deletePayment);
+// --- PROTECTED ENDPOINTS ---
+// Use authMiddleware to populate req.user for these routes
+paymentRouter.post("/stkpush", authMiddleware, collectPayment);
+paymentRouter.get("/status/:checkoutRequestID", authMiddleware, checkPaymentStatus); 
+
+// This is the one causing your Dashboard 401 error
+paymentRouter.get("/", authMiddleware, getPayments);
+
+paymentRouter.get("/:id", authMiddleware, getPaymentById);
+
+// Restricted actions (Optional: use your adminOrLandlord guard)
+paymentRouter.patch("/:id", authMiddleware, adminOrLandlord, updatePayment);
+paymentRouter.delete("/:id", authMiddleware, adminOrLandlord, deletePayment);
 
 export default paymentRouter;

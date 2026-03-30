@@ -2,8 +2,8 @@
 import { Route } from "react-router-dom";
 
 import LandlordDashboard from "../pages/landlord/dashboard/LandlordDashboard";
-import Bookings from "../pages/landlord/bookings/Bookings";
-import Leases from "../pages/landlord/leases/Leases";
+import Bookings from "../components/Bookings";
+import Leases from "../components/Leases";
 import MaintenanceRequests from "../pages/landlord/maintenance/MaintenanceRequests";
 // IMPORT YOUR NEW PAYMENT COMPONENT
 import PaymentDashboard from "../components/PaymentDashboard"; 

@@ -2,10 +2,10 @@ import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { 
   initiateSTKPush, 
   checkPaymentStatus, 
-  getPayments as fetchPaymentsApi, // Matches the 'export const getPayments' in your api file
-  Payment, 
+  getPaymentsApi,
   STKPushPayload,
-  PaymentStatusResponse 
+  PaymentStatusResponse,
+  Payment
 } from "../../api/payments";
 
 interface PaymentState {
@@ -34,20 +34,15 @@ const initialState: PaymentState = {
    THUNKS
 ========================= */
 
-// 1. Start the Payment
-export const startSTKPush = createAsyncThunk<
-  string, 
-  STKPushPayload, 
-  { rejectValue: string }
->(
+// 1. Start STK Push & Trigger Polling
+export const startSTKPush = createAsyncThunk<string, STKPushPayload, { rejectValue: string }>(
   "payments/startSTK",
   async (payload, thunkAPI) => {
     try {
       const response = await initiateSTKPush(payload);
-      // Accessing the PascalCase property from your STKPushResponse interface
-      const checkoutID = response.CheckoutRequestID;
+      // Ensure we use the correct key from your controller response
+      const checkoutID = response.CheckoutRequestID || (response as any).checkoutRequestID;
       
-      // Immediately start polling
       thunkAPI.dispatch(pollPaymentStatus(checkoutID));
       return checkoutID;
     } catch (err: any) {
@@ -57,12 +52,8 @@ export const startSTKPush = createAsyncThunk<
   }
 );
 
-// 2. Poll Status
-export const pollPaymentStatus = createAsyncThunk<
-  PaymentStatusResponse, 
-  string,                                          
-  { rejectValue: string }                          
->(
+// 2. Recursive Polling Logic
+export const pollPaymentStatus = createAsyncThunk<PaymentStatusResponse, string, { rejectValue: string }>(
   "payments/pollStatus",
   async (checkoutID, thunkAPI) => {
     const maxAttempts = 25; 
@@ -74,52 +65,47 @@ export const pollPaymentStatus = createAsyncThunk<
         
         if (attempts >= maxAttempts) {
           clearInterval(interval);
-          return reject("Payment timeout. If you paid, it will reflect in your history shortly.");
+          reject("Payment timeout. Please check your transaction history.");
+          return;
         }
 
         try {
           const data = await checkPaymentStatus(checkoutID);
-          const status = data.status?.toLowerCase();
+          const normalizedStatus = data.status?.toLowerCase();
 
-          // SUCCESS CASE
-          if (status === "paid" || status === "success" || status === "completed") {
+          if (["paid", "success", "completed"].includes(normalizedStatus)) {
             clearInterval(interval);
-            thunkAPI.dispatch(fetchAllPayments());
-            return resolve(data);
+            thunkAPI.dispatch(fetchAllPayments()); // Refresh table data
+            resolve(data);
           } 
-          
-          // FAILURE CASE
-          else if (status === "failed" || status === "cancelled") {
+          else if (["failed", "cancelled"].includes(normalizedStatus)) {
             clearInterval(interval);
-            return reject(data.message || "Transaction was cancelled or failed.");
+            reject(data.message || "Transaction was declined.");
           }
-
-          console.log(`Polling attempt ${attempts}: Still ${status}...`);
-
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (_err) {
-          // Use the variable in a log to satisfy ESLint no-unused-vars
-          console.warn("Status record not found yet. This is normal during M-Pesa processing.");
+        } catch (err) {
+          console.warn("Polling attempt failed, retrying...");
         }
-      }, 4000);
+      }, 4000); 
     });
   }
 );
 
-// 3. Fetch History (The Thunk name remains fetchAllPayments)
-export const fetchAllPayments = createAsyncThunk<
-  Payment[],
-  void,
-  { rejectValue: string }
->(
+// 3. Fetch History (Landlord/Student/Admin)
+export const fetchAllPayments = createAsyncThunk<Payment[], void, { rejectValue: string }>(
   "payments/fetchAll",
   async (_, thunkAPI) => {
     try {
-      // Calling the API function aliased as fetchPaymentsApi
-      return await fetchPaymentsApi();
-    } catch (_err) {
-      console.error("History Fetch Error:", _err);
-      return thunkAPI.rejectWithValue("Failed to fetch payment history");
+      const response = await getPaymentsApi();
+      /**
+       * CRITICAL: Some Axios configurations return the raw data, 
+       * others return the full response object. This check handles both.
+       */
+      const data = Array.isArray(response) ? response : (response as any).data;
+      return data;
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.message || "Failed to load payment records";
+      return thunkAPI.rejectWithValue(errorMsg);
     }
   }
 );
@@ -135,6 +121,9 @@ const paymentSlice = createSlice({
     resetTransaction: (state) => {
       state.currentTransaction = initialState.currentTransaction;
     },
+    clearPayments: (state) => {
+      state.payments = [];
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -158,23 +147,26 @@ const paymentSlice = createSlice({
       })
       .addCase(pollPaymentStatus.rejected, (state, action) => {
         state.currentTransaction.status = "failed";
-        state.currentTransaction.error = action.payload || "Polling failed";
+        state.currentTransaction.error = action.payload || "Transaction failed";
       })
 
-      /* HISTORY */
+      /* HISTORY LIST */
       .addCase(fetchAllPayments.pending, (state) => {
         state.loading = true;
       })
       .addCase(fetchAllPayments.fulfilled, (state, action: PayloadAction<Payment[]>) => {
         state.loading = false;
-        state.payments = action.payload;
+        // Ensure we are saving an array
+        state.payments = Array.isArray(action.payload) ? action.payload : [];
+        state.error = null;
+        console.log("✅ Redux Store Updated with", state.payments.length, "payments");
       })
       .addCase(fetchAllPayments.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || "Failed to load history";
+        state.error = action.payload || "Error fetching history";
       });
   },
 });
 
-export const { resetTransaction } = paymentSlice.actions;
+export const { resetTransaction, clearPayments } = paymentSlice.actions;
 export default paymentSlice.reducer;

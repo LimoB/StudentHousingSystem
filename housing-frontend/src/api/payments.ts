@@ -1,15 +1,15 @@
 import axiosClient from "./axios";
 
 /* =========================
-   TYPES
+   TYPES (Synced with Curl Output)
 ========================= */
 
 export interface Payment {
   id: number;
   studentId: number;
   bookingId: number;
-  amount: string;
-  status: "pending" | "paid" | "failed";
+  amount: string; // Keep as string; M-Pesa returns "1.00"
+  status: string; 
   phone: string;
   checkoutRequestID: string;
   mpesaReceiptNumber?: string;
@@ -24,8 +24,9 @@ export interface Payment {
     unit?: {
       unitNumber: string;
       property?: {
-        title: string;
+        name?: string; 
         location: string;
+        landlordId: number;
       }
     }
   };
@@ -40,12 +41,11 @@ export interface STKPushPayload {
 
 export interface STKPushResponse {
   CustomerMessage: string;
-  CheckoutRequestID: string; // Note: Big 'C' and 'R'
+  CheckoutRequestID: string; 
   ResponseCode: string;
   ResponseDescription: string;
 }
 
-// Added 'message' to the return type to fix the TS error in pollPaymentStatus
 export interface PaymentStatusResponse {
   status: string;
   message?: string; 
@@ -56,26 +56,30 @@ export interface PaymentStatusResponse {
    API CALLS
 ========================= */
 
-// INITIATE STK PUSH
+// 1. INITIATE STK PUSH
 export const initiateSTKPush = async (data: STKPushPayload): Promise<STKPushResponse> => {
   const res = await axiosClient.post("/payments/stkpush", data);
-  // Backend returns { data: result }. 'result' is the STKPushResponse.
-  return res.data.data; 
+  // Your controller sends { checkoutRequestID, data: result }
+  // This extracts the nested 'result' which contains CheckoutRequestID
+  return res.data.data || res.data; 
 };
 
-// CHECK PAYMENT STATUS
+// 2. CHECK PAYMENT STATUS
 export const checkPaymentStatus = async (checkoutID: string): Promise<PaymentStatusResponse> => {
   const res = await axiosClient.get(`/payments/status/${checkoutID}`);
+  // Returns { status, message } or the full DB record
   return res.data;
 };
 
-// GET PAYMENTS
-export const getPayments = async (): Promise<Payment[]> => {
+// 3. GET ALL PAYMENTS (The Dashboard Source)
+export const getPaymentsApi = async (): Promise<Payment[]> => {
   const res = await axiosClient.get("/payments");
-  return res.data;
+  // If backend sends [ {...} ], return res.data. 
+  // If backend sends { data: [...] }, return res.data.data.
+  return Array.isArray(res.data) ? res.data : res.data.data || [];
 };
 
-// GET PAYMENT BY ID
+// 4. GET BY ID
 export const getPaymentById = async (id: number): Promise<Payment> => {
   const res = await axiosClient.get(`/payments/${id}`);
   return res.data;

@@ -191,10 +191,11 @@ export const getPaymentStatusService = async (checkoutRequestID: string) => {
  */
 /**
  * UPDATED: Fetch payments with optional student or landlord filtering
- */
+ */// payment.service.ts
+
 export const getAllPaymentsService = async (studentId?: number, landlordId?: number) => {
-  // 1. Fetch payments with full relational branch
   const allPayments = await db.query.payments.findMany({
+    // Filter by studentId at the DB level if provided
     where: studentId ? eq(payments.studentId, studentId) : undefined,
     with: {
       student: { columns: { fullName: true, email: true } },
@@ -202,7 +203,7 @@ export const getAllPaymentsService = async (studentId?: number, landlordId?: num
         with: {
           unit: {
             with: {
-              property: true // This is where landlordId lives
+              property: true 
             }
           }
         }
@@ -211,20 +212,24 @@ export const getAllPaymentsService = async (studentId?: number, landlordId?: num
     orderBy: [desc(payments.createdAt)]
   });
 
-  // 2. Strict filtering for Landlords
   if (landlordId) {
-    return allPayments.filter(pay => {
-      // Navigate deep into the relations
-      const propertyOwnerId = (pay.booking as any)?.unit?.property?.landlordId;
+    const filtered = allPayments.filter(pay => {
+      // Drizzle 'with' returns the object based on the relation name
+      const property = pay.booking?.unit?.property;
       
-      // Safety: Only return true if both exist and match
-      return propertyOwnerId && Number(propertyOwnerId) === Number(landlordId);
+      if (!property) return false;
+
+      // Ensure we compare the IDs correctly
+      const isMatch = Number(property.landlordId) === Number(landlordId);
+      return isMatch;
     });
+
+    console.log(`[Landlord Access] User ${landlordId} saw ${filtered.length}/${allPayments.length} payments.`);
+    return filtered;
   }
 
   return allPayments;
 };
-
 
 
 
