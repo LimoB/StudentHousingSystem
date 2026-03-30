@@ -6,23 +6,39 @@ import axiosClient from "./axios";
 
 export interface MaintenanceRequest {
   id: number;
-  studentId: number;
-  unitId: number;
   description: string;
-  status: string;
+  status: "pending" | "in-progress" | "resolved" | "cancelled";
+  priority?: "low" | "medium" | "high";
   createdAt: string;
+  // Nested Student Info
+  student: {
+    fullName: string;
+    phone?: string;
+    email?: string;
+  };
+  // Nested Unit & Property Info
+  unit: {
+    unitNumber: string;
+    property: {
+      name: string;
+      location?: string;
+    };
+  };
 }
 
 export interface CreateMaintenancePayload {
   unitId: number;
   description: string;
+  priority?: string;
 }
 
 /* =========================
    GET ALL REQUESTS (ADMIN / LANDLORD)
+   Note: The backend now automatically filters 
+   by landlordId if the user is a landlord.
 ========================= */
 
-export const getMaintenanceRequests = async () => {
+export const getMaintenanceRequests = async (): Promise<MaintenanceRequest[]> => {
   const res = await axiosClient.get("/maintenance");
   return res.data;
 };
@@ -31,7 +47,7 @@ export const getMaintenanceRequests = async () => {
    GET MY REQUESTS (STUDENT)
 ========================= */
 
-export const getMyMaintenanceRequests = async () => {
+export const getMyMaintenanceRequests = async (): Promise<MaintenanceRequest[]> => {
   const res = await axiosClient.get("/maintenance/my-requests");
   return res.data;
 };
@@ -40,7 +56,7 @@ export const getMyMaintenanceRequests = async () => {
    GET REQUEST BY ID
 ========================= */
 
-export const getMaintenanceRequestById = async (id: number) => {
+export const getMaintenanceRequestById = async (id: number): Promise<MaintenanceRequest> => {
   const res = await axiosClient.get(`/maintenance/${id}`);
   return res.data;
 };
@@ -64,7 +80,7 @@ export const updateMaintenanceStatus = async (id: number, status: string) => {
 };
 
 /* =========================
-   DELETE REQUEST
+   DELETE REQUEST (ADMIN / LANDLORD)
 ========================= */
 
 export const deleteMaintenanceRequest = async (id: number) => {

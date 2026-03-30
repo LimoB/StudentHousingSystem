@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
-import { createUnitAction } from "../../../app/slices/unitSlice";
-import { fetchProperties } from "../../../app/slices/propertySlice";
-import { RootState, AppDispatch } from "../../../app/store";
+import { createUnitAction } from "../../app/slices/unitSlice";
+import { fetchProperties } from "../../app/slices/propertySlice";
+import { RootState, AppDispatch } from "../../app/store";
 import { 
   HiOutlineArrowLeft, 
   HiOutlineHomeModern, 

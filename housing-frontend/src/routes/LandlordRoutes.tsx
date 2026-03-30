@@ -4,18 +4,18 @@ import { Route } from "react-router-dom";
 import LandlordDashboard from "../pages/landlord/dashboard/LandlordDashboard";
 import Bookings from "../components/Bookings";
 import Leases from "../components/Leases";
-import MaintenanceRequests from "../pages/landlord/maintenance/MaintenanceRequests";
+import MaintenanceRequests from "../components/maintenance/MaintenanceRequests";
 // IMPORT YOUR NEW PAYMENT COMPONENT
 import PaymentDashboard from "../components/PaymentDashboard"; 
 
 // Property Management
-import Properties from "../pages/landlord/properties/Properties";
-import AddProperty from "../pages/landlord/properties/AddProperty";
+import Properties from "../components/properties/Properties";
+import AddProperty from "../components/properties/AddProperty";
 import PropertyDetail from "../components/PropertyDetail"; 
 
 // Unit Management
-import Units from "../pages/landlord/units/Units"; 
-import AddUnit from "../pages/landlord/units/AddUnit";
+import Units from "../components/units/Units"; 
+import AddUnit from "../components/units/AddUnit";
 
 const LandlordRoutes = () => {
   return (

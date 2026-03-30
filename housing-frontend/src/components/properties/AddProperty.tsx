@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { createPropertyAction } from "../../../app/slices/propertySlice";
-import { AppDispatch } from "../../../app/store";
+import { createPropertyAction } from "../../app/slices/propertySlice";
+import { AppDispatch } from "../../app/store";
 import { HiOutlineArrowLeft, HiOutlineHomeModern } from "react-icons/hi2";
 import toast from "react-hot-toast"; // 1. Import toast
 
@@ -31,6 +31,7 @@ const AddProperty: React.FC = () => {
         const errorMessage = resultAction.payload as string || "Failed to add property";
         toast.error(errorMessage, { id: loadingToast });
       }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (err) {
       toast.error("An unexpected error occurred", { id: loadingToast });
     } finally {

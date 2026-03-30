@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useCallback, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchAllPayments } from "../app/slices/paymentSlice";
 import { RootState, AppDispatch } from "../app/store";
@@ -7,58 +7,53 @@ import {
   HiOutlineCheckCircle, 
   HiOutlineClock, 
   HiOutlineExclamationCircle,
-  HiOutlineArrowPath
+  HiOutlineArrowPath,
+  HiOutlineMagnifyingGlass
 } from "react-icons/hi2";
 import { format } from "date-fns";
 
 const PaymentDashboard: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const [searchTerm, setSearchTerm] = useState("");
   
-  // 1. SELECTORS
+  const { user } = useSelector((state: RootState) => state.auth);
   const { payments, loading, error: paymentError } = useSelector((state: RootState) => state.payments);
-  const auth = useSelector((state: RootState) => state.auth) as any;
-  const user = auth?.user;
-  
-  // FIX: If isAuthenticated is undefined in Redux, we derive it from the presence of the user
-  const isAuthenticated = auth?.isAuthenticated || !!user;
 
-  const currentUserId = user?.userId || user?.id;
-
-  // 2. DEBUG LOGGING
-  useEffect(() => {
-    console.log("🛠️ [Dashboard] Auth Object from Redux:", auth);
-    console.log("🛠️ [Dashboard] Derived Authenticated Status:", isAuthenticated);
-    console.log("🛠️ [Dashboard] Payments in Store:", payments?.length || 0);
-  }, [auth, isAuthenticated, payments]);
-
+  // 1. Data Fetching Logic
   const handleSync = useCallback(() => {
-    // We allow sync if isAuthenticated is true OR if we have a valid user object
-    if (isAuthenticated || user) {
-      console.log("🚀 [Action] Condition met. Dispatching fetchAllPayments...");
-      dispatch(fetchAllPayments());
-    } else {
-      console.warn("⚠️ [Action] Sync still blocked. Both isAuthenticated and user are empty.");
-    }
-  }, [dispatch, isAuthenticated, user]);
+    dispatch(fetchAllPayments());
+  }, [dispatch]);
 
   useEffect(() => {
-    handleSync();
-  }, [handleSync]);
+    if (user) handleSync();
+  }, [handleSync, user]);
 
-  // 3. DISPLAY LOGIC
-  const displayPayments = useMemo(() => {
+  // 2. Filter & Search Logic
+  const filteredPayments = useMemo(() => {
     if (!payments || !Array.isArray(payments)) return [];
-    return payments; 
-  }, [payments]);
+    
+    return payments.filter((p: any) => {
+      const searchStr = searchTerm.toLowerCase();
+      const tenantName = p.student?.fullName?.toLowerCase() || "";
+      const propertyName = p.booking?.unit?.property?.name?.toLowerCase() || "";
+      const unitNum = p.booking?.unit?.unitNumber?.toLowerCase() || "";
+      
+      return tenantName.includes(searchStr) || 
+             propertyName.includes(searchStr) || 
+             unitNum.includes(searchStr);
+    });
+  }, [payments, searchTerm]);
 
+  // 3. Stats Calculation
   const stats = useMemo(() => {
-    const paid = displayPayments.filter((p: any) => 
+    const paid = filteredPayments.filter((p: any) => 
       ["paid", "success", "completed"].includes(p.status?.toLowerCase())
     );
     const revenue = paid.reduce((sum: number, p: any) => sum + parseFloat(p.amount || "0"), 0);
-    const pending = displayPayments.filter((p: any) => p.status?.toLowerCase() === "pending").length;
+    const pending = filteredPayments.filter((p: any) => p.status?.toLowerCase() === "pending").length;
+    
     return { revenue, paidCount: paid.length, pendingCount: pending };
-  }, [displayPayments]);
+  }, [filteredPayments]);
 
   const getStatusStyle = (status: string) => {
     const s = status?.toLowerCase() || "";
@@ -69,89 +64,122 @@ const PaymentDashboard: React.FC = () => {
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto min-h-screen bg-[#F8FAFC]">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 gap-6">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-            {user?.role === "admin" ? "Platform Finance" : "Revenue Dashboard"}
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+            {user?.role === "admin" ? "Platform Finance" : "Revenue Portfolio"}
           </h1>
-          <p className="text-gray-500 font-medium mt-1 text-sm">
-             Logged in: <span className="font-bold text-blue-600">{user?.email || "Unknown User"}</span> (ID: {currentUserId})
+          <p className="text-gray-500 font-medium mt-1 italic">
+            Tracking {filteredPayments.length} transactions for {user?.email}
           </p>
         </div>
         
         <button 
           onClick={handleSync}
           disabled={loading}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-600 hover:text-blue-600 hover:shadow-sm transition-all active:scale-95 font-bold text-sm"
+          className="p-4 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-blue-600 hover:shadow-md transition-all active:scale-95 shadow-sm"
         >
-          <HiOutlineArrowPath className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? "Syncing..." : "Sync Records"}
+          <HiOutlineArrowPath className={`w-6 h-6 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
-      {/* STATS */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        <StatCard icon={<HiOutlineBanknotes />} label="Revenue" value={`KES ${stats.revenue.toLocaleString()}`} color="blue" />
-        <StatCard icon={<HiOutlineCheckCircle />} label="Paid" value={stats.paidCount.toString()} color="emerald" />
-        <StatCard icon={<HiOutlineClock />} label="Pending" value={stats.pendingCount.toString()} color="amber" />
+        <StatCard icon={<HiOutlineBanknotes />} label="Total Revenue" value={`KES ${stats.revenue.toLocaleString()}`} color="blue" />
+        <StatCard icon={<HiOutlineCheckCircle />} label="Paid Records" value={stats.paidCount.toString()} color="emerald" />
+        <StatCard icon={<HiOutlineClock />} label="Pending Actions" value={stats.pendingCount.toString()} color="amber" />
       </div>
 
-      {/* TABLE */}
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+      {/* Search Bar */}
+      <div className="relative mb-8 group">
+        <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
+          <HiOutlineMagnifyingGlass className="w-5 h-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+        </div>
+        <input
+          type="text"
+          placeholder="Search by tenant, property, or unit..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-white border border-gray-100 py-5 pl-16 pr-6 rounded-[2rem] text-sm font-medium shadow-sm focus:ring-4 focus:ring-blue-50 focus:border-blue-200 outline-none transition-all"
+        />
+      </div>
+
+      {/* Table Section */}
+      <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden transition-all duration-500">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse min-w-[900px]">
             <thead>
-              <tr className="bg-gray-50/50">
-                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tenant</th>
-                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Property / Unit</th>
-                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Amount</th>
-                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-                <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Date</th>
+              <tr className="bg-gray-50/30">
+                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center w-16">#</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tenant Detail</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Property Assignment</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Amount</th>
+                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {displayPayments.length === 0 && !loading ? (
+              {filteredPayments.length === 0 && !loading ? (
                 <tr>
-                  <td colSpan={5} className="py-24 text-center">
-                    <HiOutlineExclamationCircle className="w-12 h-12 text-gray-200 mx-auto mb-4" />
-                    <p className="text-gray-400 font-bold">No payments found.</p>
-                    {paymentError && <p className="text-rose-400 text-xs mt-2">{paymentError}</p>}
+                  <td colSpan={6} className="py-24 text-center">
+                    <HiOutlineExclamationCircle className="w-16 h-16 text-gray-100 mx-auto mb-4" />
+                    <h2 className="text-xl font-black text-gray-900">
+                       {paymentError ? "Sync Error" : "No Transactions Found"}
+                    </h2>
+                    {paymentError ? (
+                      <p className="text-rose-500 font-bold mt-2 bg-rose-50 inline-block px-4 py-1 rounded-full text-xs">
+                        ⚠️ {paymentError}
+                      </p>
+                    ) : (
+                      <p className="text-gray-400 font-medium mt-1">Try adjusting your search or sync records.</p>
+                    )}
                   </td>
                 </tr>
               ) : (
-                displayPayments.map((p: any) => (
-                  <tr key={p.id} className="hover:bg-gray-50/50 transition-colors group">
-                    <td className="px-8 py-6">
+                filteredPayments.map((p: any, idx: number) => (
+                  <tr key={p.id} className="hover:bg-blue-50/20 transition-colors group">
+                    <td className="px-8 py-6 text-center text-xs font-black text-gray-300">
+                      {(idx + 1).toString().padStart(2, '0')}
+                    </td>
+                    <td className="px-6 py-6">
                       <div className="flex flex-col">
-                        <span className="font-bold text-gray-900">{p.student?.fullName || "Tenant"}</span>
-                        <span className="text-[11px] text-gray-400 font-medium">{p.phone}</span>
+                        <span className="font-black text-gray-800 text-sm">{p.student?.fullName || "Guest Tenant"}</span>
+                        <span className="text-[11px] text-gray-400 font-bold uppercase tracking-tighter">{p.phone || "No Phone"}</span>
                       </div>
                     </td>
                     <td className="px-6 py-6">
                       <div className="flex flex-col">
-                        <span className="font-bold text-gray-700">
-                          {p.booking?.unit?.property?.name || "Managed Property"}
+                        <span className="font-bold text-gray-700 text-sm">
+                          {p.booking?.unit?.property?.name || "Managed Asset"}
                         </span>
-                        <span className="text-[11px] text-blue-500 font-black">
-                          UNIT {p.booking?.unit?.unitNumber || "N/A"}
+                        <span className="text-[10px] text-blue-600 font-black uppercase tracking-widest">
+                          Unit {p.booking?.unit?.unitNumber || "N/A"}
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-6 font-black text-gray-900">KES {parseFloat(p.amount).toLocaleString()}</td>
+                    <td className="px-6 py-6 font-black text-gray-900 text-sm">
+                      KES {parseFloat(p.amount).toLocaleString()}
+                    </td>
                     <td className="px-6 py-6 text-center">
-                      <span className={`px-4 py-1 rounded-full text-[10px] font-black uppercase border inline-block ${getStatusStyle(p.status)}`}>
+                      <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase border inline-block tracking-tighter ${getStatusStyle(p.status)}`}>
                         {p.status}
                       </span>
                     </td>
-                    <td className="px-8 py-6 text-right text-xs text-gray-400 font-bold">
-                      {p.createdAt ? format(new Date(p.createdAt), "MMM dd, yyyy") : "---"}
+                    <td className="px-8 py-6 text-right text-[11px] text-gray-400 font-black uppercase">
+                      {p.createdAt ? format(new Date(p.createdAt), "dd MMM yyyy") : "Pending"}
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
-          {loading && <div className="p-10 text-center text-gray-400 font-bold animate-pulse uppercase text-xs">Syncing Ledger...</div>}
+          {loading && (
+            <div className="py-20 text-center flex flex-col items-center gap-4">
+               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-blue-600 border-opacity-20 border-t-blue-600"></div>
+               <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest">Updating Ledger...</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -159,14 +187,14 @@ const PaymentDashboard: React.FC = () => {
 };
 
 const StatCard = ({ icon, label, value, color }: any) => (
-  <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm transition-all hover:border-gray-200">
-    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${
+  <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm transition-all hover:shadow-md group">
+    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110 ${
       color === 'blue' ? 'bg-blue-50 text-blue-600' : color === 'emerald' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
     }`}>
-      {icon}
+      {icon && <span className="w-7 h-7">{icon}</span>}
     </div>
-    <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest">{label}</p>
-    <h3 className="text-2xl font-black text-gray-900 mt-1">{value}</h3>
+    <p className="text-gray-300 text-[10px] font-black uppercase tracking-[0.2em]">{label}</p>
+    <h3 className="text-2xl font-black text-gray-900 mt-2 tracking-tight">{value}</h3>
   </div>
 );
 

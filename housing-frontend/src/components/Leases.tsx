@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { 
@@ -8,12 +7,17 @@ import {
 } from "../app/slices/leaseSlice";
 import { RootState, AppDispatch } from "../app/store";
 import PropertyLeaseGroup from "./PropertyLeaseGroup"; 
-import { HiOutlineDocumentText, HiOutlineArrowPath, HiOutlineMagnifyingGlass, HiOutlineFunnel } from "react-icons/hi2";
+import TenantProfile from "./TenantProfile"; // Import the new component
+import { Lease } from "../api/leases";
+import { HiOutlineDocumentText, HiOutlineArrowPath, HiOutlineMagnifyingGlass } from "react-icons/hi2";
 
 const Leases: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "ended">("all");
+  
+  // NEW: State to track which student profile is being viewed
+  const [selectedStudent, setSelectedStudent] = useState<Lease["student"] | null>(null);
 
   const { user } = useSelector((state: RootState) => state.auth);
   const { leases, loading, error } = useSelector((state: RootState) => state.leases);
@@ -28,9 +32,7 @@ const Leases: React.FC = () => {
     }
   }, [dispatch, user]);
 
-  // Combined Search, Filter, and Grouping Logic
   const groupedLeases = useMemo(() => {
-    // 1. First, apply search and status filters
     const filtered = leases.filter((lease) => {
       const matchesSearch = 
         lease.student.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -42,7 +44,6 @@ const Leases: React.FC = () => {
       return matchesSearch && matchesStatus;
     });
 
-    // 2. Then group the filtered results by Property Name
     return filtered.reduce((acc, lease) => {
       const propName = lease.unit.property.name;
       if (!acc[propName]) acc[propName] = [];
@@ -58,6 +59,19 @@ const Leases: React.FC = () => {
     else if (user?.role === "landlord") dispatch(fetchLandlordLeases());
   };
 
+  // RENDER CONDITION: Show Profile View
+  if (selectedStudent) {
+    return (
+      <div className="p-6 md:p-10 max-w-7xl mx-auto min-h-screen bg-[#F8FAFC]">
+        <TenantProfile 
+          student={selectedStudent} 
+          onBack={() => setSelectedStudent(null)} 
+        />
+      </div>
+    );
+  }
+
+  // RENDER CONDITION: Loading State
   if (loading && leases.length === 0) {
     return (
       <div className="py-32 flex flex-col items-center justify-center text-center bg-[#F8FAFC] min-h-screen">
@@ -81,7 +95,6 @@ const Leases: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
-          {/* Status Filter Toggle */}
           <div className="flex bg-white border border-gray-100 p-1 rounded-2xl shadow-sm">
             {(["all", "active", "ended"] as const).map((s) => (
               <button
@@ -133,9 +146,6 @@ const Leases: React.FC = () => {
           <p className="text-gray-400 font-medium mt-2 max-w-xs mx-auto">
             {searchTerm ? `No results for "${searchTerm}"` : "Lease agreements will appear here once approved."}
           </p>
-          {searchTerm && (
-            <button onClick={() => setSearchTerm("")} className="mt-6 text-blue-600 font-bold text-sm underline">Clear Search</button>
-          )}
         </div>
       ) : (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -144,6 +154,8 @@ const Leases: React.FC = () => {
               key={name} 
               propertyName={name} 
               leases={groupedLeases[name]} 
+              // NEW: Pass the selection handler down
+              onViewProfile={(student) => setSelectedStudent(student)}
             />
           ))}
         </div>

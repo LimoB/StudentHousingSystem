@@ -3,6 +3,7 @@ import {
   createMaintenanceRequestService,
   deleteMaintenanceRequestService,
   getMaintenanceRequestsService,
+  getLandlordMaintenanceRequestsService,
   getMaintenanceRequestByIdService,
   getMyMaintenanceRequestsService,
   updateMaintenanceStatusService,
@@ -10,7 +11,17 @@ import {
 
 export const getMaintenanceRequests = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const data = await getMaintenanceRequestsService();
+    const user = (req as any).user;
+    let data;
+
+    if (user?.role === "admin") {
+      data = await getMaintenanceRequestsService();
+    } else if (user?.role === "landlord") {
+      data = await getLandlordMaintenanceRequestsService(user.userId);
+    } else {
+      return res.status(403).json({ message: "Forbidden: Access denied" });
+    }
+
     res.status(200).json(data);
   } catch (error) {
     next(error);
@@ -58,6 +69,8 @@ export const createMaintenanceRequest = async (req: Request, res: Response, next
 
 export const updateMaintenanceStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Note: You might want to add a check here to ensure the landlord
+    // actually owns the property this request belongs to.
     const message = await updateMaintenanceStatusService(Number(req.params.id), req.body.status);
     res.status(200).json({ message });
   } catch (error) {

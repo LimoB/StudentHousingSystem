@@ -8,6 +8,7 @@ import {
   Unit,
   CreateUnitPayload
 } from "../../api/units";
+import { RootState } from "../../app/store"; // Accessing RootState for role checks
 
 /* =========================
    STATE
@@ -28,12 +29,19 @@ const initialState: UnitState = {
    THUNKS
 ========================= */
 
-export const fetchUnits = createAsyncThunk(
+// UPDATED: Added RootState to the thunk type definition
+export const fetchUnits = createAsyncThunk<any, void, { state: RootState; rejectValue: string }>(
   "units/fetchAll",
   async (_, thunkAPI) => {
     try {
+      const state = thunkAPI.getState();
+      const user = state.auth.user;
+
+      // Note: If your backend requires a different endpoint for admins to see ALL units,
+      // you would toggle it here. For now, we call getUnits() and log the role context.
       const data = await getUnits();
-      console.log("📡 API Raw Response (fetchAll):", data); // DEBUG
+      
+      console.log(`📡 API Sync (${user?.role}):`, data.length || 0, "units received"); 
       return data;
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch units");
@@ -113,12 +121,11 @@ const unitSlice = createSlice({
       .addCase(fetchUnits.fulfilled, (state, action: PayloadAction<any>) => {
         state.loading = false;
         
-        // DEFENSIVE CHECK: Handle if backend sends { units: [...] } or just [...]
+        // Defensive check for data structure
         const incomingData = Array.isArray(action.payload) 
           ? action.payload 
           : (action.payload?.units || []);
         
-        console.log("✅ Slice processed units:", incomingData.length);
         state.units = incomingData;
       })
       .addCase(fetchUnits.rejected, (state, action) => {
@@ -128,7 +135,6 @@ const unitSlice = createSlice({
       .addCase(fetchUnitsByProperty.fulfilled, (state, action: PayloadAction<any>) => {
         state.loading = false;
         
-        // DEFENSIVE CHECK
         const incomingUnits = Array.isArray(action.payload) 
           ? action.payload 
           : (action.payload?.units || []);

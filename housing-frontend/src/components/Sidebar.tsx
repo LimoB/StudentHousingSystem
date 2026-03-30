@@ -44,7 +44,6 @@ const Sidebar = ({ role }: SidebarProps) => {
       { title: "Payments", path: "payments", icon: <FaMoneyBillWave /> },
       { title: "Leases", path: "leases", icon: <FaFileContract /> }, // Fixed Icon
       { title: "Maintenance", path: "maintenance", icon: <FaTools /> },
-      { title: "Tenants", path: "tenants", icon: <FaUsers /> },
     ],
 
     admin: [

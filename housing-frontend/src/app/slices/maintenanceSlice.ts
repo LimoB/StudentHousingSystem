@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import {
   getMaintenanceRequests,
   getMyMaintenanceRequests,
@@ -32,8 +32,7 @@ const initialState: MaintenanceState = {
    THUNKS
 ========================= */
 
-/* FETCH ALL REQUESTS */
-
+// Fetches all (Admin) or filtered (Landlord) requests
 export const fetchMaintenanceRequests = createAsyncThunk(
   "maintenance/fetchAll",
   async (_, thunkAPI) => {
@@ -47,8 +46,7 @@ export const fetchMaintenanceRequests = createAsyncThunk(
   }
 );
 
-/* FETCH MY REQUESTS */
-
+// Student view
 export const fetchMyMaintenanceRequests = createAsyncThunk(
   "maintenance/fetchMine",
   async (_, thunkAPI) => {
@@ -56,13 +54,11 @@ export const fetchMyMaintenanceRequests = createAsyncThunk(
       return await getMyMaintenanceRequests();
     } catch (error: any) {
       return thunkAPI.rejectWithValue(
-        error?.response?.data?.message || "Failed to fetch maintenance requests"
+        error?.response?.data?.message || "Failed to fetch your requests"
       );
     }
   }
 );
-
-/* FETCH REQUEST BY ID */
 
 export const fetchRequestById = createAsyncThunk(
   "maintenance/fetchById",
@@ -71,13 +67,11 @@ export const fetchRequestById = createAsyncThunk(
       return await getMaintenanceRequestById(id);
     } catch (error: any) {
       return thunkAPI.rejectWithValue(
-        error?.response?.data?.message || "Failed to fetch request"
+        error?.response?.data?.message || "Failed to fetch request details"
       );
     }
   }
 );
-
-/* CREATE REQUEST */
 
 export const createMaintenanceRequestAction = createAsyncThunk(
   "maintenance/create",
@@ -86,19 +80,18 @@ export const createMaintenanceRequestAction = createAsyncThunk(
       return await createMaintenanceRequest(payload);
     } catch (error: any) {
       return thunkAPI.rejectWithValue(
-        error?.response?.data?.message || "Failed to create request"
+        error?.response?.data?.message || "Failed to submit request"
       );
     }
   }
 );
 
-/* UPDATE STATUS */
-
 export const updateMaintenanceStatusAction = createAsyncThunk(
   "maintenance/updateStatus",
   async ({ id, status }: { id: number; status: string }, thunkAPI) => {
     try {
-      return await updateMaintenanceStatus(id, status);
+      await updateMaintenanceStatus(id, status);
+      return { id, status };
     } catch (error: any) {
       return thunkAPI.rejectWithValue(
         error?.response?.data?.message || "Failed to update status"
@@ -106,8 +99,6 @@ export const updateMaintenanceStatusAction = createAsyncThunk(
     }
   }
 );
-
-/* DELETE REQUEST */
 
 export const deleteMaintenanceRequestAction = createAsyncThunk(
   "maintenance/delete",
@@ -130,92 +121,75 @@ export const deleteMaintenanceRequestAction = createAsyncThunk(
 const maintenanceSlice = createSlice({
   name: "maintenance",
   initialState,
-  reducers: {},
+  reducers: {
+    clearMaintenanceError: (state) => {
+      state.error = null;
+    },
+    setSelectedRequest: (state, action: PayloadAction<MaintenanceRequest | null>) => {
+      state.selectedRequest = action.payload;
+    },
+  },
 
   extraReducers: (builder) => {
     builder
-
-      /* FETCH ALL REQUESTS */
-
+      /* FETCH ALL/LANDLORD REQUESTS */
       .addCase(fetchMaintenanceRequests.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-
       .addCase(fetchMaintenanceRequests.fulfilled, (state, action) => {
         state.loading = false;
         state.requests = action.payload;
       })
-
       .addCase(fetchMaintenanceRequests.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })
 
-      /* FETCH MY REQUESTS */
-
+      /* FETCH MY REQUESTS (STUDENT) */
       .addCase(fetchMyMaintenanceRequests.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-
       .addCase(fetchMyMaintenanceRequests.fulfilled, (state, action) => {
         state.loading = false;
         state.requests = action.payload;
       })
-
       .addCase(fetchMyMaintenanceRequests.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })
 
-      /* FETCH REQUEST BY ID */
-
-      .addCase(fetchRequestById.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-
+      /* FETCH BY ID */
       .addCase(fetchRequestById.fulfilled, (state, action) => {
         state.loading = false;
         state.selectedRequest = action.payload;
       })
 
-      .addCase(fetchRequestById.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
-
-      /* CREATE REQUEST */
-
+      /* CREATE */
       .addCase(createMaintenanceRequestAction.fulfilled, (state, action) => {
-        state.requests.push(action.payload);
+        // action.payload is the new request from the server
+        state.requests.unshift(action.payload); 
       })
 
       /* UPDATE STATUS */
-
       .addCase(updateMaintenanceStatusAction.fulfilled, (state, action) => {
-        const { id, status } = action.meta.arg;
+        const { id, status } = action.payload;
 
         state.requests = state.requests.map((req) =>
-          req.id === id ? { ...req, status } : req
+          req.id === id ? { ...req, status: status as any } : req
         );
 
         if (state.selectedRequest?.id === id) {
-          state.selectedRequest = {
-            ...state.selectedRequest,
-            status,
-          };
+          state.selectedRequest.status = status as any;
         }
       })
 
-      /* DELETE REQUEST */
-
+      /* DELETE */
       .addCase(deleteMaintenanceRequestAction.fulfilled, (state, action) => {
         state.requests = state.requests.filter(
           (req) => req.id !== action.payload
         );
-
         if (state.selectedRequest?.id === action.payload) {
           state.selectedRequest = null;
         }
@@ -223,4 +197,5 @@ const maintenanceSlice = createSlice({
   },
 });
 
+export const { clearMaintenanceError, setSelectedRequest } = maintenanceSlice.actions;
 export default maintenanceSlice.reducer;

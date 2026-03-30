@@ -1,14 +1,25 @@
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import db from "../drizzle/db";
 import { units, properties } from "../drizzle/schema";
 
 export type TUnitInsert = typeof units.$inferInsert;
 
 /* ================================
-   GET LANDLORD UNITS ONLY
+   GET UNITS (Admin = All, Landlord = Filtered)
 ================================ */
-export const getUnitsService = async (landlordId: number) => {
-  // Join with properties to ensure we only get units where property.landlordId matches
+export const getUnitsService = async (landlordId?: number) => {
+  // If no landlordId is provided, it's an Admin request: Return all units
+  if (!landlordId) {
+    return await db.query.units.findMany({
+      with: {
+        property: {
+          columns: { name: true, location: true, landlordId: true }
+        }
+      }
+    });
+  }
+
+  // Otherwise, filter by landlordId via existence check in properties table
   return await db.query.units.findMany({
     where: (units, { exists }) => exists(
       db.select()
@@ -22,7 +33,7 @@ export const getUnitsService = async (landlordId: number) => {
     ),
     with: {
       property: {
-        columns: { name: true, location: true }
+        columns: { name: true, location: true, landlordId: true }
       }
     }
   });
@@ -31,38 +42,47 @@ export const getUnitsService = async (landlordId: number) => {
 /* ================================
    GET UNIT BY ID (Secure)
 =============================== */
-export const getUnitByIdService = async (unitId: number, landlordId: number) => {
+export const getUnitByIdService = async (unitId: number, landlordId?: number) => {
   const result = await db.query.units.findFirst({
-    where: and(eq(units.id, unitId)),
+    where: eq(units.id, unitId),
     with: {
       property: true
     }
   });
 
-  // Verify ownership after fetch (or include in 'where' via a join)
-  if (result && result.property.landlordId !== landlordId) {
+  if (!result) return null;
+
+  // If landlordId is provided (Landlord), check ownership. 
+  // If undefined (Admin), bypass.
+  if (landlordId && result.property.landlordId !== landlordId) {
     return null; 
   }
+  
   return result;
 };
 
 /* ================================
    GET UNITS BY PROPERTY (Secure)
 ================================ */
-export const getUnitsByPropertyService = async (propertyId: number, landlordId: number) => {
-  // Verify the property belongs to the landlord before returning its units
-  const propertyOwner = await db.query.properties.findFirst({
-    where: and(eq(properties.id, propertyId), eq(properties.landlordId, landlordId))
-  });
+export const getUnitsByPropertyService = async (propertyId: number, landlordId?: number) => {
+  // If landlordId is provided, verify ownership first
+  if (landlordId) {
+    const propertyOwner = await db.query.properties.findFirst({
+      where: and(eq(properties.id, propertyId), eq(properties.landlordId, landlordId))
+    });
+    if (!propertyOwner) return [];
+  }
 
-  if (!propertyOwner) return [];
-
+  // Admin or verified Landlord proceeds to fetch units
   return await db.query.units.findMany({
     where: eq(units.propertyId, propertyId),
+    with: {
+      property: {
+        columns: { name: true, location: true }
+      }
+    }
   });
 };
-
-// ... keep create, update, delete standard, but check ownership in controller
 
 /* ================================
    CREATE UNIT

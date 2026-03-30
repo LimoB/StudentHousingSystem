@@ -1,9 +1,9 @@
 import { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { fetchProperties } from "../../../app/slices/propertySlice";
-import type { RootState, AppDispatch } from "../../../app/store";
-import PropertyCard from "../../../components/PropertyCard";
+import { fetchProperties } from "../../app/slices/propertySlice";
+import type { RootState, AppDispatch } from "../../app/store";
+import PropertyCard from "../PropertyCard";
 import { 
   HiOutlinePlus, 
   HiOutlineHomeModern 

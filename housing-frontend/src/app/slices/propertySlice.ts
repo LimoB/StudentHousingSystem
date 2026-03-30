@@ -9,7 +9,7 @@ import {
   CreatePropertyPayload,
 } from "../../api/properties";
 import { createUnitAction, deleteUnitAction, updateUnitAction } from "./unitSlice";
-
+import { RootState } from "../../app/store"; // Added to access Auth state
 
 interface PropertyState {
   properties: Property[];
@@ -29,11 +29,21 @@ const initialState: PropertyState = {
    THUNKS
 ========================= */
 
-export const fetchProperties = createAsyncThunk<Property[], void, { rejectValue: string }>(
+// UPDATED: Added { state: RootState } to access the user role
+export const fetchProperties = createAsyncThunk<Property[], void, { rejectValue: string; state: RootState }>(
   "properties/fetchAll",
   async (_, thunkAPI) => {
     try {
-      return await getProperties();
+      const state = thunkAPI.getState();
+      const user = state.auth.user;
+
+      // LOGIC: If Admin, your backend usually needs a specific flag or different route
+      // If your backend handles this automatically via the token, getProperties() is fine.
+      // If you have an admin-specific route, call it here based on user.role.
+      const response = await getProperties();
+      
+      console.log(`📡 Property Sync (${user?.role}):`, response.length, "items found.");
+      return response;
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch properties");
     }
@@ -56,7 +66,6 @@ export const createPropertyAction = createAsyncThunk<Property, CreatePropertyPay
   async (payload, thunkAPI) => {
     try {
       const response = await createProperty(payload);
-      // Ensure we return the 'property' object inside the response
       return response.property; 
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to create property");
@@ -65,7 +74,7 @@ export const createPropertyAction = createAsyncThunk<Property, CreatePropertyPay
 );
 
 export const updatePropertyAction = createAsyncThunk<
-  Property, // Return the updated property from backend
+  Property, 
   { id: number; data: Partial<CreatePropertyPayload> },
   { rejectValue: string }
 >("properties/update", async (payload, thunkAPI) => {
@@ -123,7 +132,6 @@ const propertySlice = createSlice({
 
       /* CREATE */
       .addCase(createPropertyAction.fulfilled, (state, action: PayloadAction<Property>) => {
-        // Backend returns a single property, we add it to our list
         state.properties.unshift({ ...action.payload, units: [] });
       })
 
@@ -145,18 +153,13 @@ const propertySlice = createSlice({
       })
 
       /* CROSS-SLICE LISTENERS: UNITS */
-      // When a unit is added, inject it into the local units array of the parent property
       .addCase(createUnitAction.fulfilled, (state, action: any) => {
         const newUnit = action.payload.unit || action.payload;
         const targetId = newUnit.propertyId;
-
-        // Update in the list
         const propertyInList = state.properties.find(p => p.id === targetId);
         if (propertyInList) {
           propertyInList.units = propertyInList.units ? [...propertyInList.units, newUnit] : [newUnit];
         }
-
-        // Update in the selected property view
         if (state.selectedProperty && state.selectedProperty.id === targetId) {
           state.selectedProperty.units = state.selectedProperty.units 
             ? [...state.selectedProperty.units, newUnit] 
@@ -167,11 +170,9 @@ const propertySlice = createSlice({
       .addCase(updateUnitAction.fulfilled, (state, action: any) => {
         const updatedUnit = action.payload.unit || action.payload;
         const updateInArray = (units: any[]) => units.map(u => u.id === updatedUnit.id ? updatedUnit : u);
-
         state.properties.forEach(p => {
           if (p.units) p.units = updateInArray(p.units);
         });
-
         if (state.selectedProperty?.units) {
           state.selectedProperty.units = updateInArray(state.selectedProperty.units);
         }
@@ -180,11 +181,9 @@ const propertySlice = createSlice({
       .addCase(deleteUnitAction.fulfilled, (state, action: any) => {
         const deletedId = action.payload;
         const filterArray = (units: any[]) => units.filter(u => u.id !== deletedId);
-
         state.properties.forEach(p => {
           if (p.units) p.units = filterArray(p.units);
         });
-
         if (state.selectedProperty?.units) {
           state.selectedProperty.units = filterArray(state.selectedProperty.units);
         }
