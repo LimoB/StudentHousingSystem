@@ -2,6 +2,7 @@ import { Route } from "react-router-dom";
 
 // Dashboard & Core
 import StudentDashboard from "../pages/student/dashboard/StudentDashboard";
+import Profile from "../components/Profile"; // SYNCED: The Unified Profile Component
 
 // Bookings
 import Bookings from "../pages/student/bookings/Bookings";
@@ -17,7 +18,7 @@ import MaintenanceRequests from "../pages/student/maintenance/MaintenanceRequest
 import RequestDetail from "../pages/student/maintenance/RequestDetail";
 import CreateRequest from "../pages/student/maintenance/CreateRequest"; 
 
-// Notifications (The component we just updated)
+// Notifications 
 import Notifications from "../pages/student/notifications/Notifications";
 
 // Payments
@@ -33,36 +34,29 @@ import Units from "../pages/student/units/Units";
 const StudentRoutes = () => {
   return (
     <>
-      {/* Overview */}
+      {/* 1. Overview & Identity */}
       <Route path="dashboard" element={<StudentDashboard />} />
-
-      {/* Notifications - Essential for the "View Context" links from backend */}
       <Route path="notifications" element={<Notifications />} />
+      <Route path="profile" element={<Profile />} /> {/* SYNCED: Identity Self-Service */}
 
-      {/* Booking Flow & Payments */}
+      {/* 2. Booking Flow & Financials */}
       <Route path="bookings" element={<Bookings />} />
       <Route path="bookings/:id" element={<BookingDetail />} />
       <Route path="bookings/:bookingId/pay" element={<PaymentBookingApproval />} />
+      <Route path="payments" element={<Payments />} />
+      <Route path="payments/:id" element={<PaymentDetail />} />
 
-      {/* Lease Management */}
+      {/* 3. Living Experience (Leases & Maintenance) */}
       <Route path="leases" element={<Leases />} />
       <Route path="leases/:id" element={<LeaseDetail />} />
-
-      {/* Maintenance System */}
       <Route path="maintenance" element={<MaintenanceRequests />} />
       <Route path="maintenance/create" element={<CreateRequest />} />
       <Route path="maintenance/:id" element={<RequestDetail />} />
 
-      {/* Financial History */}
-      <Route path="payments" element={<Payments />} />
-      <Route path="payments/:id" element={<PaymentDetail />} />
-
-      {/* Property Discovery */}
+      {/* 4. Property Discovery */}
       <Route path="properties" element={<Properties />} />
       <Route path="properties/:id" element={<PropertyDetail />} />
       <Route path="properties/:id/book" element={<BookProperty />} />
-
-      {/* Unit Explorer */}
       <Route path="properties/:id/units" element={<Units />} />
     </>
   );

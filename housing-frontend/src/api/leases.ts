@@ -14,6 +14,8 @@ export interface Lease {
   createdAt: string;
   // Nested relational data sent by the Service mapping
   student: {
+    id: number;
+    createdAt: any;
     fullName: string;
     email: string;
     phone?: string;

@@ -6,7 +6,7 @@ import {
   FaMoneyBillWave,
   FaTools,
   FaUsers,
-  FaFileAlt,
+  // FaFileAlt,
   FaBuilding,
   FaBell,
   FaDoorOpen,
@@ -58,7 +58,7 @@ const Sidebar = ({ role }: SidebarProps) => {
       { title: "Leases", path: "leases", icon: <FaFileContract /> },
       { title: "Maintenance", path: "maintenance", icon: <FaTools /> },
       { title: "Notifications", path: "notifications", icon: <FaBell />, badge: unreadCount },
-      { title: "Reports", path: "reports", icon: <FaFileAlt /> },
+      // { title: "Reports", path: "reports", icon: <FaFileAlt /> },
     ],
   };
 

@@ -5,7 +5,8 @@ import Bookings from "../components/Bookings";
 import Leases from "../components/Leases";
 import MaintenanceRequests from "../components/maintenance/MaintenanceRequests";
 import PaymentDashboard from "../components/PaymentDashboard"; 
-import Notifications from "../components/Notifications"; // Added this
+import Notifications from "../components/Notifications"; 
+import Profile from "../components/Profile"; // SYNCED: The Unified Profile Component
 
 // Property Management
 import Properties from "../components/properties/Properties";
@@ -19,21 +20,24 @@ import UnitManagement from "../components/units/UnitManagement";
 const LandlordRoutes = () => {
   return (
     <>
-      {/* Overview & Operations */}
+      {/* 1. Overview & Identity */}
       <Route path="dashboard" element={<LandlordDashboard />} />
-      <Route path="notifications" element={<Notifications />} /> {/* Link established */}
+      <Route path="notifications" element={<Notifications />} />
+      <Route path="profile" element={<Profile />} /> {/* SYNCED: Identity Self-Service */}
+
+      {/* 2. Operations & Revenue */}
       <Route path="bookings" element={<Bookings />} />
       <Route path="payments" element={<PaymentDashboard />} />
       <Route path="leases" element={<Leases />} />
       <Route path="maintenance" element={<MaintenanceRequests />} />
 
-      {/* Property Management */}
+      {/* 3. Portfolio Management (Properties) */}
       <Route path="properties" element={<Properties />} />
       <Route path="properties/add" element={<PropertyEdit />} />      
       <Route path="properties/edit/:id" element={<PropertyEdit />} />  
       <Route path="properties/:id" element={<PropertyDetail />} />
 
-      {/* Unit Management */}
+      {/* 4. Inventory Management (Units) */}
       <Route path="units" element={<Units />} />      
       <Route path="units/add" element={<UnitManagement />} />         
       <Route path="units/edit/:id" element={<UnitManagement />} />    
