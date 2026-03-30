@@ -42,8 +42,14 @@ export const createUser = async (req: Request, res: Response, next: NextFunction
 
 export const updateUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const message = await updateUserService(Number(req.params.id), req.body);
-    res.status(200).json({ message });
+    const id = Number(req.params.id);
+    const updatedUser = await updateUserService(id, req.body);
+    
+    // Returning the user object here is what makes the Frontend work
+    res.status(200).json({ 
+      message: "User updated successfully", 
+      user: updatedUser 
+    });
   } catch (error) {
     next(error);
   }
@@ -64,8 +70,11 @@ export const updateProfile = async (req: Request, res: Response, next: NextFunct
     const userId = (req as any).user?.userId;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const message = await updateProfileService(userId, req.body);
-    res.status(200).json({ message });
+    const updatedProfile = await updateProfileService(userId, req.body);
+    res.status(200).json({ 
+      message: "Profile updated successfully", 
+      user: updatedProfile 
+    });
   } catch (error) {
     next(error);
   }

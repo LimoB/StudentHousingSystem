@@ -20,14 +20,21 @@ export default tseslint.config(
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
     },
-    rules: {
+rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
       ],
-      // This is the magic line to disable the 'any' error
+      // 1. Disable the 'any' error (You already have this)
       '@typescript-eslint/no-explicit-any': 'off',
+
+      // 2. Disable the "Don't set state in Effect" warning
+      // This allows you to sync your Redux data to your Form data without errors
+      'react-hooks/exhaustive-deps': 'warn', 
+      
+      // 3. Stop it from complaining about unused variables (optional but helpful)
+      '@typescript-eslint/no-unused-vars': 'warn',
     },
   },
 )

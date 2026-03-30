@@ -6,17 +6,20 @@ import {
   type LoginRequest, 
   type RegisterRequest 
 } from "../../api/auth";
+import { updateProfileAction } from "./userSlice"; // Import the profile update action
 
 /* =========================
    TYPES
 ========================= */
 
 export interface User {
-  userId: number; 
+  id: number;
+  userId: number; // Keep both for safety
   fullName: string;
   email: string;
   role: "student" | "admin" | "landlord";
   phone?: string;
+  createdAt: string | number | Date;
 }
 
 interface ApiError {
@@ -36,14 +39,15 @@ interface AuthState {
 }
 
 /* =========================
-   INITIAL STATE
+   PERSISTENCE HELPERS
 ========================= */
 
 const getStoredUser = (): User | null => {
   const stored = localStorage.getItem("user");
   if (!stored) return null;
   try {
-    return JSON.parse(stored) as User;
+    const user = JSON.parse(stored);
+    return { ...user, userId: user.userId || user.id } as User;
   } catch {
     return null;
   }
@@ -65,11 +69,13 @@ export const login = createAsyncThunk(
   async (credentials: LoginRequest, thunkAPI) => {
     try {
       const data = await loginUser(credentials);
-      // Persist immediately on success
       if (data.token) {
+        // Standardize the user object before storing
+        const standardizedUser = { ...data.user, userId: data.user.userId || data.user.id };
         localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("user", JSON.stringify(standardizedUser));
         localStorage.setItem("userRole", data.user.role);
+        return { ...data, user: standardizedUser } as AuthResponse;
       }
       return data as AuthResponse;
     } catch (error: unknown) {
@@ -87,9 +93,11 @@ export const register = createAsyncThunk(
     try {
       const data = await registerUser(payload);
       if (data.token) {
+        const standardizedUser = { ...data.user, userId: data.user.userId || data.user.id };
         localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("user", JSON.stringify(standardizedUser));
         localStorage.setItem("userRole", data.user.role);
+        return { ...data, user: standardizedUser } as AuthResponse;
       }
       return data as AuthResponse;
     } catch (error: unknown) {
@@ -110,10 +118,7 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     logout(state) {
-      // Clear everything
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("userRole");
+      localStorage.clear(); // Nukes everything for security
       state.user = null;
       state.token = null;
       state.error = null;
@@ -133,14 +138,10 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user as User;
         state.token = action.payload.token;
-        state.error = null;
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
-        // Clean up if login failed to prevent ghost sessions
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
       })
 
       /* REGISTER */
@@ -152,11 +153,16 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user as User;
         state.token = action.payload.token;
-        state.error = null;
       })
-      .addCase(register.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
+
+      /* UPDATE PROFILE SYNC 
+         This keeps the logged-in user state fresh when they change their own profile
+      */
+      .addCase(updateProfileAction.fulfilled, (state, action) => {
+        if (state.user && state.user.userId === action.payload.userId) {
+          state.user = action.payload;
+          localStorage.setItem("user", JSON.stringify(action.payload));
+        }
       });
   },
 });

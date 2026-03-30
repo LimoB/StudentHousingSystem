@@ -9,21 +9,21 @@ export type TUserSelect = typeof users.$inferSelect;
 type PublicUser = Omit<TUserSelect, "password">;
 
 /* ================================
-   GET ALL USERS (With Summary Relations)
+   GET ALL USERS
 ================================ */
 export const getUsersService = async () => {
   return await db.query.users.findMany({
     columns: { password: false },
     with: {
-      properties: { columns: { id: true } }, // Useful for Landlord stats
-      bookings: { columns: { id: true } },   // Useful for Student stats
+      properties: { columns: { id: true } },
+      bookings: { columns: { id: true } },
     },
     orderBy: (users, { desc }) => [desc(users.createdAt)]
   });
 };
 
 /* ================================
-   GET USER BY ID (Full Relations)
+   GET USER BY ID
 ================================ */
 export const getUserByIdService = async (userId: number) => {
   return await db.query.users.findFirst({
@@ -41,7 +41,7 @@ export const getUserByIdService = async (userId: number) => {
 
 /* ================================
    CREATE USER
-================================ */
+=============================== */
 export const createUserService = async (user: TUserInsert): Promise<PublicUser> => {
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(user.password, salt);
@@ -58,36 +58,52 @@ export const createUserService = async (user: TUserInsert): Promise<PublicUser> 
 /* ================================
    UPDATE USER (ADMIN)
 ================================ */
-export const updateUserService = async (userId: number, updates: Partial<TUserInsert>) => {
+export const updateUserService = async (userId: number, updates: Partial<TUserInsert>): Promise<PublicUser> => {
   const payload = { ...updates };
 
-  if (payload.password) {
+  // Logic: Only hash if a new password was actually sent
+  if (payload.password && payload.password.trim() !== "") {
     const salt = await bcrypt.genSalt(10);
     payload.password = await bcrypt.hash(payload.password, salt);
+  } else {
+    delete payload.password; // Prevent overwriting with empty/null
   }
 
-  const result = await db.update(users).set(payload).where(eq(users.id, userId)).returning();
+  const result = await db.update(users)
+    .set(payload)
+    .where(eq(users.id, userId))
+    .returning();
+
   if (!result.length) throw new Error("User not found");
-  return "User updated successfully";
+
+  const { password, ...safeUser } = result[0];
+  return safeUser; // Returns the updated object to the controller
 };
 
 /* ================================
-   UPDATE PROFILE (Restricted)
+   UPDATE PROFILE (USER SELF-SERVICE)
 ================================ */
-export const updateProfileService = async (userId: number, updates: Partial<TUserInsert>) => {
+export const updateProfileService = async (userId: number, updates: Partial<TUserInsert>): Promise<PublicUser> => {
   const payload = { ...updates };
   
-  // Security: Prevent users from changing their own role via profile update
-  delete payload.role;
+  delete payload.role; // Security: User cannot change their own role
 
-  if (payload.password) {
+  if (payload.password && payload.password.trim() !== "") {
     const salt = await bcrypt.genSalt(10);
     payload.password = await bcrypt.hash(payload.password, salt);
+  } else {
+    delete payload.password;
   }
 
-  const result = await db.update(users).set(payload).where(eq(users.id, userId)).returning();
+  const result = await db.update(users)
+    .set(payload)
+    .where(eq(users.id, userId))
+    .returning();
+
   if (!result.length) throw new Error("User not found");
-  return "Profile updated successfully";
+
+  const { password, ...safeUser } = result[0];
+  return safeUser;
 };
 
 /* ================================

@@ -1,4 +1,4 @@
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, SQL } from "drizzle-orm";
 import db from "../drizzle/db";
 import { 
   maintenanceRequests, 
@@ -6,57 +6,61 @@ import {
   properties, 
   users 
 } from "../drizzle/schema";
+import { PgTable } from "drizzle-orm/pg-core";
 
-// Type helpers for environments with strict/broken inference
+// 1. Cast tables to unknown first, then to PgTable to break the "protected" conflict
 const m = maintenanceRequests as any;
-const u = units as any;
-const p = properties as any;
+const u = units as unknown as PgTable<any>;
+const p = properties as unknown as PgTable<any>;
 const s = users as any;
 
 export type TMRequestInsert = typeof maintenanceRequests.$inferInsert;
 
 /* ================================
-   GET LANDLORD REQUESTS (Join-Based)
+   GET LANDLORD REQUESTS (Relational API)
    Filters maintenance by units owned by the landlord
 ================================ */
 export const getLandlordMaintenanceRequestsService = async (landlordId: number) => {
-  const result = await db
-    .select({
-      id: m.id,
-      description: m.description,
-      status: m.status,
-      priority: m.priority,
-      createdAt: m.createdAt,
-      studentName: s.fullName,
-      studentPhone: s.phone,
-      unitNumber: u.unitNumber,
-      propertyName: p.name,
-    })
-    .from(m)
-    .innerJoin(u, eq(m.unitId, u.id))
-    .innerJoin(p, eq(u.propertyId, p.id))
-    .innerJoin(s, eq(m.studentId, s.id))
-    .where(eq(p.landlordId, landlordId))
-    .orderBy(desc(m.createdAt));
-
-  // Format to match the frontend expected nested structure
-  return result.map((row) => ({
-    id: row.id,
-    description: row.description,
-    status: row.status,
-    priority: row.priority,
-    createdAt: row.createdAt,
-    student: {
-      fullName: row.studentName,
-      phone: row.studentPhone,
-    },
-    unit: {
-      unitNumber: row.unitNumber,
-      property: {
-        name: row.propertyName,
+  // Use the relational API to avoid manual join column mapping issues
+  const results = await db.query.maintenanceRequests.findMany({
+    where: (maintenance, { exists }) => 
+      // We use the casted variables (u, p) here to avoid the TS error
+      exists(
+        db.select()
+          .from(u)
+          .innerJoin(p, eq((u as any).propertyId, (p as any).id))
+          .where(
+            and(
+              eq((u as any).id, maintenance.unitId),
+              eq((p as any).landlordId, landlordId)
+            )
+          )
+      ),
+    with: {
+      student: { 
+        columns: { 
+          fullName: true, 
+          phone: true 
+        } 
       },
+      unit: {
+        columns: { 
+          unitNumber: true 
+        },
+        with: {
+          property: { 
+            columns: { 
+              name: true 
+            } 
+          }
+        }
+      }
     },
-  }));
+    // We use the original maintenanceRequests object here for the sort
+    orderBy: [desc(maintenanceRequests.createdAt)]
+  });
+
+  return results;
 };
 
 /* ================================
