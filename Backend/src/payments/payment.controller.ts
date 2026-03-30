@@ -69,6 +69,9 @@ export const mpesaCallback = async (req: Request, res: Response, next: NextFunct
 /**
  * 3. GET STATUS FOR FRONTEND POLLING
  */
+/**
+ * 3. GET STATUS FOR FRONTEND POLLING
+ */
 export const checkPaymentStatus = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const checkoutID = req.params.checkoutRequestID as string;
@@ -77,17 +80,26 @@ export const checkPaymentStatus = async (req: Request, res: Response, next: Next
     const data = await PaymentService.getPaymentStatusService(checkoutID);
     
     if (data) {
+      // If found in DB, return the actual record (Completed or Failed)
       console.log(`Status found for ${checkoutID}: ${data.status}`);
       res.status(200).json(data);
     } else {
-      console.warn(`No payment session found for ${checkoutID}`);
-      res.status(404).json({ message: "Payment session not found" });
+      /**
+       * FIX: Instead of 404, return 200 with a pending status.
+       * This prevents Axios from throwing an error on the frontend
+       * and allows the polling interval to keep running until the callback hits.
+       */
+      console.warn(`Callback not yet received for ${checkoutID}. Still polling...`);
+      res.status(200).json({ 
+        status: "pending", 
+        message: "Waiting for M-Pesa confirmation..." 
+      });
     }
   } catch (error) {
+    console.error("Error checking payment status:", error);
     next(error);
   }
 };
-
 /**
  * 4. CRUD: GET ALL
  */

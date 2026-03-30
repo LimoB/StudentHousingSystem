@@ -9,28 +9,37 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
-  const { token, user } = useSelector((state: RootState) => state.auth);
+  const { token: reduxToken, user: reduxUser } = useSelector((state: RootState) => state.auth);
   const location = useLocation();
 
-  // Check both Redux state AND localStorage for persistence reliability
-  const isAuthenticated = token || localStorage.getItem("token");
-  const currentUser = user || JSON.parse(localStorage.getItem("user") || "null");
+  // STABILITY FIX: Prioritize localStorage during route transitions
+  // This prevents the "logout" flicker when Redux is still updating.
+  const storedToken = localStorage.getItem("token");
+  const storedUserRaw = localStorage.getItem("user");
+  const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
+
+  const isAuthenticated = !!(reduxToken || storedToken);
+  const currentUser = reduxUser || storedUser;
 
   // 1. Not logged in -> Redirect to login
   if (!isAuthenticated || !currentUser) {
+    // Log for debugging if you hit the redirect unexpectedly
+    console.warn("[AuthGuard] No session found. Redirecting to login.");
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // 2. Role Authorization -> Prevent cross-role access
-  // Example: A student trying to access /admin/dashboard
-  if (allowedRoles && !allowedRoles.includes(currentUser.role)) {
-    // Redirect them to their own correct dashboard if they are in the wrong place
-    return <Navigate to={`/${currentUser.role}/dashboard`} replace />;
+  // 2. Role Authorization
+  // We use the role from storedUser if reduxUser is temporarily null
+  const currentRole = currentUser?.role;
+
+  if (allowedRoles && !allowedRoles.includes(currentRole)) {
+    console.warn(`[AuthGuard] Access denied for role: ${currentRole}`);
+    return <Navigate to={`/${currentRole}/dashboard`} replace />;
   }
 
   // 3. Root Path Redirection
   if (location.pathname === "/") {
-    return <Navigate to={`/${currentUser.role}/dashboard`} replace />;
+    return <Navigate to={`/${currentRole}/dashboard`} replace />;
   }
 
   return <>{children}</>;

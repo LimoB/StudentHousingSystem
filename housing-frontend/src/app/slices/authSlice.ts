@@ -19,11 +19,11 @@ export interface User {
   phone?: string;
 }
 
-// Interface to handle backend error shapes without using 'any'
 interface ApiError {
   response?: {
     data?: {
       error?: string;
+      message?: string;
     };
   };
 }
@@ -65,14 +65,17 @@ export const login = createAsyncThunk(
   async (credentials: LoginRequest, thunkAPI) => {
     try {
       const data = await loginUser(credentials);
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      // Persist immediately on success
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("userRole", data.user.role);
+      }
       return data as AuthResponse;
     } catch (error: unknown) {
-      // Cast the unknown error to our ApiError interface safely
       const err = error as ApiError;
       return thunkAPI.rejectWithValue(
-        err.response?.data?.error || "Login failed"
+        err.response?.data?.error || err.response?.data?.message || "Login failed"
       );
     }
   }
@@ -83,8 +86,11 @@ export const register = createAsyncThunk(
   async (payload: RegisterRequest, thunkAPI) => {
     try {
       const data = await registerUser(payload);
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        localStorage.setItem("userRole", data.user.role);
+      }
       return data as AuthResponse;
     } catch (error: unknown) {
       const err = error as ApiError;
@@ -104,8 +110,10 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     logout(state) {
+      // Clear everything
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      localStorage.removeItem("userRole");
       state.user = null;
       state.token = null;
       state.error = null;
@@ -125,10 +133,14 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user as User;
         state.token = action.payload.token;
+        state.error = null;
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+        // Clean up if login failed to prevent ghost sessions
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
       })
 
       /* REGISTER */
@@ -140,6 +152,7 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user as User;
         state.token = action.payload.token;
+        state.error = null;
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;

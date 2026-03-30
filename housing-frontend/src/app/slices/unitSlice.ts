@@ -32,7 +32,9 @@ export const fetchUnits = createAsyncThunk(
   "units/fetchAll",
   async (_, thunkAPI) => {
     try {
-      return await getUnits();
+      const data = await getUnits();
+      console.log("📡 API Raw Response (fetchAll):", data); // DEBUG
+      return data;
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch units");
     }
@@ -43,7 +45,8 @@ export const fetchUnitsByProperty = createAsyncThunk(
   "units/fetchByProperty",
   async (propertyId: number, thunkAPI) => {
     try {
-      return await getUnitsByProperty(propertyId);
+      const data = await getUnitsByProperty(propertyId);
+      return data;
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch property units");
     }
@@ -107,25 +110,36 @@ const unitSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchUnits.fulfilled, (state, action: PayloadAction<Unit[]>) => {
+      .addCase(fetchUnits.fulfilled, (state, action: PayloadAction<any>) => {
         state.loading = false;
-        state.units = action.payload;
+        
+        // DEFENSIVE CHECK: Handle if backend sends { units: [...] } or just [...]
+        const incomingData = Array.isArray(action.payload) 
+          ? action.payload 
+          : (action.payload?.units || []);
+        
+        console.log("✅ Slice processed units:", incomingData.length);
+        state.units = incomingData;
       })
       .addCase(fetchUnits.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })
-      .addCase(fetchUnitsByProperty.fulfilled, (state, action: PayloadAction<Unit[]>) => {
+      .addCase(fetchUnitsByProperty.fulfilled, (state, action: PayloadAction<any>) => {
         state.loading = false;
-        const incomingUnits = action.payload;
+        
+        // DEFENSIVE CHECK
+        const incomingUnits = Array.isArray(action.payload) 
+          ? action.payload 
+          : (action.payload?.units || []);
+
         const otherUnits = state.units.filter(
-          (existing) => !incomingUnits.some((incoming) => incoming.id === existing.id)
+          (existing) => !incomingUnits.some((incoming: any) => incoming.id === existing.id)
         );
         state.units = [...otherUnits, ...incomingUnits];
       })
-      .addCase(createUnitAction.fulfilled, (state, action) => {
+      .addCase(createUnitAction.fulfilled, (state, action: PayloadAction<any>) => {
         state.loading = false;
-        // Adjusted to handle backend returning { message, unit }
         const newUnit = action.payload.unit || action.payload;
         if (newUnit) state.units.unshift(newUnit); 
       })

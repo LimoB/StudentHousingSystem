@@ -2,9 +2,10 @@ import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { 
   initiateSTKPush, 
   checkPaymentStatus, 
-  getPayments, 
+  getPayments as fetchPaymentsApi, // Matches the 'export const getPayments' in your api file
   Payment, 
-  STKPushPayload 
+  STKPushPayload,
+  PaymentStatusResponse 
 } from "../../api/payments";
 
 interface PaymentState {
@@ -43,9 +44,12 @@ export const startSTKPush = createAsyncThunk<
   async (payload, thunkAPI) => {
     try {
       const response = await initiateSTKPush(payload);
-      // Automatically trigger polling
-      thunkAPI.dispatch(pollPaymentStatus(response.CheckoutRequestID));
-      return response.CheckoutRequestID;
+      // Accessing the PascalCase property from your STKPushResponse interface
+      const checkoutID = response.CheckoutRequestID;
+      
+      // Immediately start polling
+      thunkAPI.dispatch(pollPaymentStatus(checkoutID));
+      return checkoutID;
     } catch (err: any) {
       const msg = err?.response?.data?.error || "Failed to initiate payment";
       return thunkAPI.rejectWithValue(msg);
@@ -53,54 +57,56 @@ export const startSTKPush = createAsyncThunk<
   }
 );
 
-// 2. Poll Status (Standardized Recursive Logic)
+// 2. Poll Status
 export const pollPaymentStatus = createAsyncThunk<
-  { status: string; mpesaReceiptNumber?: string }, 
+  PaymentStatusResponse, 
   string,                                          
   { rejectValue: string }                          
 >(
   "payments/pollStatus",
   async (checkoutID, thunkAPI) => {
-    const maxAttempts = 30; 
+    const maxAttempts = 25; 
     let attempts = 0;
 
-    try {
-      // Return the result of the promise to the thunk
-      return await new Promise<{ status: string; mpesaReceiptNumber?: string }>((resolve, reject) => {
-        const interval = setInterval(async () => {
-          attempts++;
-          
-          if (attempts >= maxAttempts) {
+    return new Promise<PaymentStatusResponse>((resolve, reject) => {
+      const interval = setInterval(async () => {
+        attempts++;
+        
+        if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          return reject("Payment timeout. If you paid, it will reflect in your history shortly.");
+        }
+
+        try {
+          const data = await checkPaymentStatus(checkoutID);
+          const status = data.status?.toLowerCase();
+
+          // SUCCESS CASE
+          if (status === "paid" || status === "success" || status === "completed") {
             clearInterval(interval);
-            return reject("Payment timeout. If you paid, it will reflect shortly.");
+            thunkAPI.dispatch(fetchAllPayments());
+            return resolve(data);
+          } 
+          
+          // FAILURE CASE
+          else if (status === "failed" || status === "cancelled") {
+            clearInterval(interval);
+            return reject(data.message || "Transaction was cancelled or failed.");
           }
 
-          try {
-            const data = await checkPaymentStatus(checkoutID);
-            const status = data.status?.toLowerCase();
+          console.log(`Polling attempt ${attempts}: Still ${status}...`);
 
-            if (status === "paid" || status === "success") {
-              clearInterval(interval);
-              thunkAPI.dispatch(fetchAllPayments());
-              return resolve(data);
-            } else if (status === "failed") {
-              clearInterval(interval);
-              return reject("Transaction was cancelled or failed.");
-            }
-          } catch {
-            // Error variable omitted to satisfy ESLint no-unused-vars
-            console.log("Polling for payment status...");
-          }
-        }, 4000);
-      });
-    } catch (error) {
-      // Map the promise rejection to Redux's rejectWithValue
-      return thunkAPI.rejectWithValue(error as string);
-    }
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_err) {
+          // Use the variable in a log to satisfy ESLint no-unused-vars
+          console.warn("Status record not found yet. This is normal during M-Pesa processing.");
+        }
+      }, 4000);
+    });
   }
 );
 
-// 3. Fetch History
+// 3. Fetch History (The Thunk name remains fetchAllPayments)
 export const fetchAllPayments = createAsyncThunk<
   Payment[],
   void,
@@ -109,8 +115,10 @@ export const fetchAllPayments = createAsyncThunk<
   "payments/fetchAll",
   async (_, thunkAPI) => {
     try {
-      return await getPayments();
-    } catch {
+      // Calling the API function aliased as fetchPaymentsApi
+      return await fetchPaymentsApi();
+    } catch (_err) {
+      console.error("History Fetch Error:", _err);
       return thunkAPI.rejectWithValue("Failed to fetch payment history");
     }
   }

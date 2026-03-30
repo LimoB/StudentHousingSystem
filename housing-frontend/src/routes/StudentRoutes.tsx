@@ -2,27 +2,20 @@
 import { Route } from "react-router-dom";
 
 import StudentDashboard from "../pages/student/dashboard/StudentDashboard";
-
 import Bookings from "../pages/student/bookings/Bookings";
 import BookingDetail from "../pages/student/bookings/BookingDetail";
 import PaymentBookingApproval from "../pages/student/bookings/PaymentBookingApproval"; 
-
 import Leases from "../pages/student/leases/Leases";
 import LeaseDetail from "../pages/student/leases/LeaseDetail";
-
 import MaintenanceRequests from "../pages/student/maintenance/MaintenanceRequests";
 import RequestDetail from "../pages/student/maintenance/RequestDetail";
-import CreateRequest from "../pages/student/maintenance/CreateRequest"; // Import the new create page
-
+import CreateRequest from "../pages/student/maintenance/CreateRequest"; 
 import Notifications from "../pages/student/notifications/Notifications";
-
 import Payments from "../pages/student/payments/Payments";
 import PaymentDetail from "../pages/student/payments/PaymentDetail";
-
 import Properties from "../pages/student/properties/Properties";
 import PropertyDetail from "../pages/student/properties/PropertyDetail";
 import BookProperty from "../pages/student/properties/BookProperty";
-
 import Units from "../pages/student/units/Units";
 
 const StudentRoutes = () => {
@@ -31,12 +24,15 @@ const StudentRoutes = () => {
       {/* Dashboard */}
       <Route path="dashboard" element={<StudentDashboard />} />
 
-      {/* Bookings */}
+      {/* Bookings & Payments */}
       <Route path="bookings" element={<Bookings />} />
       <Route path="bookings/:id" element={<BookingDetail />} />
       
-      {/* NEW: Payment Approval Route */}
-      <Route path="payment/:bookingId" element={<PaymentBookingApproval />} />
+      {/* STABILITY FIX: 
+          This route must exist here so that '/student/bookings/:bookingId/pay' 
+          renders within the Student DashboardLayout Outlet.
+      */}
+      <Route path="bookings/:bookingId/pay" element={<PaymentBookingApproval />} />
 
       {/* Leases */}
       <Route path="leases" element={<Leases />} />
@@ -45,7 +41,6 @@ const StudentRoutes = () => {
       {/* Maintenance */}
       <Route path="maintenance" element={<MaintenanceRequests />} />
       <Route path="maintenance/:id" element={<RequestDetail />} />
-      {/* NEW: Dedicated Create Maintenance Page */}
       <Route path="maintenance/create" element={<CreateRequest />} />
 
       {/* Notifications */}

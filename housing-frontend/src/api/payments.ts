@@ -14,7 +14,6 @@ export interface Payment {
   checkoutRequestID: string;
   mpesaReceiptNumber?: string;
   createdAt: string;
-  // Added nested relations for Landlord/Admin views
   student?: {
     fullName: string;
     email: string;
@@ -41,9 +40,16 @@ export interface STKPushPayload {
 
 export interface STKPushResponse {
   CustomerMessage: string;
-  CheckoutRequestID: string;
+  CheckoutRequestID: string; // Note: Big 'C' and 'R'
   ResponseCode: string;
   ResponseDescription: string;
+}
+
+// Added 'message' to the return type to fix the TS error in pollPaymentStatus
+export interface PaymentStatusResponse {
+  status: string;
+  message?: string; 
+  mpesaReceiptNumber?: string;
 }
 
 /* =========================
@@ -53,17 +59,17 @@ export interface STKPushResponse {
 // INITIATE STK PUSH
 export const initiateSTKPush = async (data: STKPushPayload): Promise<STKPushResponse> => {
   const res = await axiosClient.post("/payments/stkpush", data);
-  // Matches backend: res.status(200).json({ ..., data: result })
+  // Backend returns { data: result }. 'result' is the STKPushResponse.
   return res.data.data; 
 };
 
-// CHECK PAYMENT STATUS (For Polling)
-export const checkPaymentStatus = async (checkoutID: string): Promise<{ status: string; mpesaReceiptNumber?: string }> => {
+// CHECK PAYMENT STATUS
+export const checkPaymentStatus = async (checkoutID: string): Promise<PaymentStatusResponse> => {
   const res = await axiosClient.get(`/payments/status/${checkoutID}`);
   return res.data;
 };
 
-// GET PAYMENTS (Now context-aware: Student gets theirs, Landlord gets their property payments)
+// GET PAYMENTS
 export const getPayments = async (): Promise<Payment[]> => {
   const res = await axiosClient.get("/payments");
   return res.data;

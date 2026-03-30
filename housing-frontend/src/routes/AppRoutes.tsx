@@ -9,10 +9,10 @@ import DashboardLayout from "../layouts/DashboardLayout";
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* PUBLIC ROUTES (Login, Register, etc.) */}
+      {/* 1. PUBLIC ROUTES */}
       {PublicRoutes()}
 
-      {/* ADMIN SECTION */}
+      {/* 2. ADMIN SECTION */}
       <Route
         path="/admin"
         element={
@@ -21,10 +21,11 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
+        {/* Call the routes as children of the Layout */}
         {AdminRoutes()}
       </Route>
 
-      {/* LANDLORD SECTION */}
+      {/* 3. LANDLORD SECTION */}
       <Route
         path="/landlord"
         element={
@@ -36,7 +37,7 @@ const AppRoutes = () => {
         {LandlordRoutes()}
       </Route>
 
-      {/* STUDENT SECTION */}
+      {/* 4. STUDENT SECTION */}
       <Route
         path="/student"
         element={
@@ -45,11 +46,21 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       >
+        {/* FIXED: We include the routes directly here. 
+            Because StudentRoutes() returns <Route> components, 
+            they will render inside the <Outlet /> of DashboardLayout.
+        */}
         {StudentRoutes()}
+        
+        {/* Redirect /student to /student/dashboard */}
+        <Route index element={<Navigate to="dashboard" replace />} />
       </Route>
 
-      {/* CATCH-ALL REDIRECT */}
+      {/* 5. CATCH-ALL REDIRECT */}
+      {/* If path is "/", ProtectedRoute will handle the redirection logic */}
       <Route path="/" element={<ProtectedRoute children={null} />} />
+      
+      {/* Absolute fallback to login */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
