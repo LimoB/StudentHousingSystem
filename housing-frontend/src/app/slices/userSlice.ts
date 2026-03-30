@@ -1,18 +1,30 @@
-// src/app/slices/userSlice.ts
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import {
   getUsers,
   createUser,
   updateUser,
   deleteUser,
   updateProfile,
+  type CreateUserPayload,
+  type UpdateUserPayload,
 } from "../../api/users";
+// Use the User interface from authSlice
+import { User } from "./authSlice"; 
 
 /* =========================
-   STATE
+   TYPES & STATE
 ========================= */
+
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
 interface UserState {
-  users: any[];
+  users: User[]; 
   loading: boolean;
   error: string | null;
 }
@@ -26,35 +38,52 @@ const initialState: UserState = {
 /* =========================
    THUNKS
 ========================= */
+
 export const fetchUsers = createAsyncThunk(
   "users/fetchAll",
   async (_, thunkAPI) => {
     try {
-      return await getUsers();
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      const response = await getUsers();
+      // Map 'id' from API to 'userId' for Redux if they differ
+      return response.map((u: any) => ({
+        ...u,
+        userId: u.userId || u.id 
+      })) as User[];
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      return thunkAPI.rejectWithValue(err.response?.data?.message || "Failed to fetch users");
     }
   }
 );
 
 export const createUserAction = createAsyncThunk(
   "users/create",
-  async (payload: any, thunkAPI) => {
+  async (payload: CreateUserPayload, thunkAPI) => { // Use specific payload type
     try {
-      return await createUser(payload);
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      const response = await createUser(payload);
+      return {
+        ...response.user,
+        userId: (response.user as any).id || response.user.userId
+      } as User;
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      return thunkAPI.rejectWithValue(err.response?.data?.message || "Failed to create user");
     }
   }
 );
 
 export const updateUserAction = createAsyncThunk(
   "users/update",
-  async ({ id, data }: { id: number; data: any }, thunkAPI) => {
+  async ({ id, data }: { id: number; data: UpdateUserPayload }, thunkAPI) => {
     try {
-      return await updateUser(id, data);
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      const response = await updateUser(id, data);
+      return {
+        ...response.user,
+        userId: (response.user as any).id || response.user.userId
+      } as User;
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      return thunkAPI.rejectWithValue(err.response?.data?.message || "Failed to update user");
     }
   }
 );
@@ -65,19 +94,25 @@ export const deleteUserAction = createAsyncThunk(
     try {
       await deleteUser(id);
       return id;
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      return thunkAPI.rejectWithValue(err.response?.data?.message || "Failed to delete user");
     }
   }
 );
 
 export const updateProfileAction = createAsyncThunk(
   "users/updateProfile",
-  async (data: any, thunkAPI) => {
+  async (data: UpdateUserPayload, thunkAPI) => {
     try {
-      return await updateProfile(data);
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      const response = await updateProfile(data);
+      return {
+        ...response.user,
+        userId: (response.user as any).id || response.user.userId
+      } as User;
+    } catch (error: unknown) {
+      const err = error as ApiError;
+      return thunkAPI.rejectWithValue(err.response?.data?.message || "Failed to update profile");
     }
   }
 );
@@ -95,7 +130,7 @@ const userSlice = createSlice({
       .addCase(fetchUsers.pending, (state) => {
         state.loading = true;
       })
-      .addCase(fetchUsers.fulfilled, (state, action) => {
+      .addCase(fetchUsers.fulfilled, (state, action: PayloadAction<User[]>) => {
         state.loading = false;
         state.users = action.payload;
       })
@@ -105,29 +140,27 @@ const userSlice = createSlice({
       })
 
       /* CREATE */
-      .addCase(createUserAction.fulfilled, (state, action) => {
-        state.users.push(action.payload.user);
+      .addCase(createUserAction.fulfilled, (state, action: PayloadAction<User>) => {
+        state.users.push(action.payload);
       })
 
       /* UPDATE */
-      .addCase(updateUserAction.fulfilled, (state, action) => {
-        const { id } = action.meta.arg;
+      .addCase(updateUserAction.fulfilled, (state, action: PayloadAction<User>) => {
         state.users = state.users.map((u) =>
-          u.id === id ? { ...u, ...action.meta.arg.data } : u
+          u.userId === action.payload.userId ? action.payload : u
         );
       })
 
       /* DELETE */
-      .addCase(deleteUserAction.fulfilled, (state, action) => {
-        state.users = state.users.filter((u) => u.id !== action.payload);
+      .addCase(deleteUserAction.fulfilled, (state, action: PayloadAction<number>) => {
+        state.users = state.users.filter((u) => u.userId !== action.payload);
       })
 
       /* UPDATE PROFILE */
-      .addCase(updateProfileAction.fulfilled, (state, action) => {
-        // update current user in users array if needed
-        const updatedUser = action.payload.user;
+      .addCase(updateProfileAction.fulfilled, (state, action: PayloadAction<User>) => {
+        const updatedUser = action.payload;
         state.users = state.users.map((u) =>
-          u.id === updatedUser.id ? updatedUser : u
+          u.userId === updatedUser.userId ? updatedUser : u
         );
       });
   },

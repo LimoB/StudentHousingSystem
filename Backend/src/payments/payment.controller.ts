@@ -102,15 +102,32 @@ export const checkPaymentStatus = async (req: Request, res: Response, next: Next
 
 export const getPayments = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // 1. Get studentId from the request object (attached by your Auth Middleware)
-    // Adjust 'req.user.id' or 'req.user.userId' based on your JWT payload structure
-    const studentId = (req as any).user?.id || (req as any).user?.userId;
+    const user = (req as any).user;
+    
+    // 1. CRITICAL: Force the ID to be a Number
+    const userId = Number(user?.id || user?.userId);
+    const userRole = user?.role;
 
-    // 2. Pass the studentId to the service
-    const data = await PaymentService.getAllPaymentsService(studentId);
+    console.log(`[GetPayments] User: ${userId} | Role: ${userRole}`);
+
+    let data;
+
+    if (userRole === "landlord") {
+      // 2. Logic for landlord: 
+      // First arg (studentId) = undefined
+      // Second arg (landlordId) = userId
+      data = await PaymentService.getAllPaymentsService(undefined, userId);
+    } else if (userRole === "student") {
+      // Logic for student: 1st arg is studentId
+      data = await PaymentService.getAllPaymentsService(userId);
+    } else {
+      // Admin: Get everything
+      data = await PaymentService.getAllPaymentsService();
+    }
     
     res.status(200).json(data);
   } catch (error) {
+    console.error("Error in getPayments controller:", error);
     next(error);
   }
 };

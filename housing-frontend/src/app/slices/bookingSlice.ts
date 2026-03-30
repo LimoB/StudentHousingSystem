@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction, Action } from "@reduxjs/toolkit";
 import {
   getBookings,
+  getLandlordBookings,
   getMyBookings,
   getBookingById,
   createBooking,
@@ -37,7 +38,18 @@ export const fetchBookings = createAsyncThunk(
     try {
       return await getBookings();
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch bookings");
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch all bookings");
+    }
+  }
+);
+
+export const fetchLandlordBookings = createAsyncThunk(
+  "bookings/fetchLandlordBookings",
+  async (_, thunkAPI) => {
+    try {
+      return await getLandlordBookings();
+    } catch (error: any) {
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch landlord bookings");
     }
   }
 );
@@ -48,7 +60,7 @@ export const fetchMyBookings = createAsyncThunk(
     try {
       return await getMyBookings();
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch my bookings");
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch student bookings");
     }
   }
 );
@@ -59,7 +71,7 @@ export const fetchBookingById = createAsyncThunk(
     try {
       return await getBookingById(id);
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch booking");
+      return thunkAPI.rejectWithValue(error?.response?.data?.message || "Failed to fetch booking details");
     }
   }
 );
@@ -104,7 +116,6 @@ export const deleteBookingAction = createAsyncThunk(
    SLICE
 ========================= */
 
-// Helper type for matcher payloads
 interface RejectedAction extends Action {
   payload: string;
 }
@@ -113,35 +124,44 @@ const bookingSlice = createSlice({
   name: "bookings",
   initialState,
   reducers: {
+    // FIX: clearSelectedBooking now also clears the error state
     clearSelectedBooking: (state) => {
       state.selectedBooking = null;
+      state.error = null;
     }
   },
 
   extraReducers: (builder) => {
     builder
-      /* 1. SPECIFIC CASES (MUST BE FIRST) */
-
-      // FETCH ALL/MY BOOKINGS
+      // FETCH ALL / LANDLORD / STUDENT BOOKINGS
       .addCase(fetchBookings.fulfilled, (state, action: PayloadAction<Booking[]>) => {
         state.loading = false;
         state.bookings = action.payload;
+        state.error = null; // Clear error on success
+      })
+      .addCase(fetchLandlordBookings.fulfilled, (state, action: PayloadAction<Booking[]>) => {
+        state.loading = false;
+        state.bookings = action.payload;
+        state.error = null; // Clear error on success
       })
       .addCase(fetchMyBookings.fulfilled, (state, action: PayloadAction<Booking[]>) => {
         state.loading = false;
         state.bookings = action.payload;
+        state.error = null; // Clear error on success
       })
 
       // FETCH BY ID
       .addCase(fetchBookingById.fulfilled, (state, action: PayloadAction<Booking>) => {
         state.loading = false;
         state.selectedBooking = action.payload;
+        state.error = null;
       })
 
-      // CREATE BOOKING
+      // CREATE
       .addCase(createBookingAction.fulfilled, (state, action: PayloadAction<Booking>) => {
         state.loading = false;
         state.bookings.unshift(action.payload);
+        state.error = null;
       })
 
       // UPDATE STATUS
@@ -154,24 +174,25 @@ const bookingSlice = createSlice({
         if (state.selectedBooking?.id === action.payload.id) {
           state.selectedBooking.status = action.payload.status;
         }
+        state.error = null;
       })
 
-      // DELETE BOOKING
+      // DELETE
       .addCase(deleteBookingAction.fulfilled, (state, action: PayloadAction<number>) => {
         state.loading = false;
         state.bookings = state.bookings.filter((b) => b.id !== action.payload);
         if (state.selectedBooking?.id === action.payload) {
           state.selectedBooking = null;
         }
+        state.error = null;
       })
 
-      /* 2. MATCHERS (MUST BE LAST) */
-
+      /* MATCHERS */
       .addMatcher(
         (action): action is Action => action.type.endsWith("/pending"),
         (state) => {
           state.loading = true;
-          state.error = null;
+          state.error = null; // Clear previous errors when a new request starts
         }
       )
       .addMatcher(

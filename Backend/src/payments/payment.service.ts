@@ -189,17 +189,44 @@ export const getPaymentStatusService = async (checkoutRequestID: string) => {
 /**
  * UPDATED: Fetch payments with optional student filtering
  */
-export const getAllPaymentsService = async (studentId?: number) => {
-  return await db.query.payments.findMany({
-    // Add this filter logic
+/**
+ * UPDATED: Fetch payments with optional student or landlord filtering
+ */
+export const getAllPaymentsService = async (studentId?: number, landlordId?: number) => {
+  // 1. Fetch payments with full relational branch
+  const allPayments = await db.query.payments.findMany({
     where: studentId ? eq(payments.studentId, studentId) : undefined,
     with: {
       student: { columns: { fullName: true, email: true } },
-      booking: true
+      booking: {
+        with: {
+          unit: {
+            with: {
+              property: true // This is where landlordId lives
+            }
+          }
+        }
+      }
     },
     orderBy: [desc(payments.createdAt)]
   });
+
+  // 2. Strict filtering for Landlords
+  if (landlordId) {
+    return allPayments.filter(pay => {
+      // Navigate deep into the relations
+      const propertyOwnerId = (pay.booking as any)?.unit?.property?.landlordId;
+      
+      // Safety: Only return true if both exist and match
+      return propertyOwnerId && Number(propertyOwnerId) === Number(landlordId);
+    });
+  }
+
+  return allPayments;
 };
+
+
+
 
 export const getPaymentByIdService = async (id: number) => {
   return await db.query.payments.findFirst({

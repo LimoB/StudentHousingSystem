@@ -8,12 +8,13 @@ export interface Property {
   id: number;
   name: string;
   location: string;
+  landlordId?: number;
 }
 
 export interface Unit {
   id: number;
   unitNumber: string;
-  unitType?: string; // Added to match your UI usage
+  unitType?: string;
   price: number;
   property?: Property;
 }
@@ -22,19 +23,17 @@ export interface Booking {
   id: number;
   studentId: number;
   unitId: number;
-  // Updated status to include all possible states from your UI
   status: "pending" | "approved" | "rejected" | "paid" | "confirmed"; 
-  moveInDate: string; // <--- ADDED THIS TO FIX THE ERROR
+  moveInDate: string;
   createdAt: string;
   updatedAt?: string;
-  // Relational data
   student?: {
     id: number;
     fullName: string;
     email: string;
   }; 
   unit?: Unit;
-  payments?: any[]; // Added for the delete-check logic
+  payments?: any[];
 }
 
 export interface CreateBookingPayload {
@@ -51,6 +50,12 @@ export interface CreateBookingPayload {
 // GET ALL BOOKINGS (ADMIN)
 export const getBookings = async (): Promise<Booking[]> => {
   const res = await axiosClient.get<Booking[]>("/bookings");
+  return res.data;
+};
+
+// GET LANDLORD BOOKINGS (NEW)
+export const getLandlordBookings = async (): Promise<Booking[]> => {
+  const res = await axiosClient.get<Booking[]>("/bookings/landlord");
   return res.data;
 };
 

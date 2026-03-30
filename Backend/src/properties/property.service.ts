@@ -6,17 +6,27 @@ export type TPropertyInsert = typeof properties.$inferInsert;
 
 /* ================================
    GET ALL PROPERTIES (With Relations)
-================================ */
+========================= */
 export const getPropertiesService = async (
-  filter?: { status?: "available" | "occupied" }
+  filter?: { status?: "available" | "occupied"; landlordId?: number }
 ) => {
+  let condition: SQL | undefined = undefined;
+
+  const conditions: SQL[] = [];
+  if (filter?.status) conditions.push(eq(properties.status, filter.status));
+  if (filter?.landlordId) conditions.push(eq(properties.landlordId, filter.landlordId));
+
+  if (conditions.length > 0) {
+    condition = and(...conditions);
+  }
+
   return await db.query.properties.findMany({
-    where: filter?.status ? eq(properties.status, filter.status) : undefined,
+    where: condition,
     with: {
       landlord: {
         columns: { fullName: true, phone: true, email: true }
       },
-      units: true // Pulls all rooms/units for each property
+      units: true 
     },
     orderBy: (properties, { desc }) => [desc(properties.createdAt)]
   });
@@ -24,34 +34,30 @@ export const getPropertiesService = async (
 
 /* ================================
    GET PROPERTY BY ID (Deep Relations)
-================================ */
+========================= */
 export const getPropertyByIdService = async (
   propertyId: number,
-  filter?: { status?: "available" | "occupied" }
+  filter?: { status?: "available" | "occupied"; landlordId?: number }
 ) => {
-  let condition: SQL<unknown> = eq(properties.id, propertyId);
+  const conditions: SQL[] = [eq(properties.id, propertyId)];
 
-  if (filter?.status) {
-    condition = and(condition, eq(properties.status, filter.status))!;
-  }
+  if (filter?.status) conditions.push(eq(properties.status, filter.status));
+  if (filter?.landlordId) conditions.push(eq(properties.landlordId, filter.landlordId));
 
   return await db.query.properties.findFirst({
-    where: condition,
+    where: and(...conditions),
     with: {
       landlord: {
         columns: { fullName: true, phone: true, email: true }
       },
-      units: {
-        // You can even filter units here if needed
-        where: eq(units.isAvailable, true)
-      }
+      units: true 
     }
   });
 };
 
 /* ================================
    CREATE PROPERTY
-================================ */
+========================= */
 export const createPropertyService = async (property: TPropertyInsert) => {
   const result = await db.insert(properties).values(property).returning();
   return result[0];
@@ -59,7 +65,7 @@ export const createPropertyService = async (property: TPropertyInsert) => {
 
 /* ================================
    UPDATE PROPERTY
-================================ */
+========================= */
 export const updatePropertyService = async (
   propertyId: number,
   updates: Partial<TPropertyInsert>
@@ -76,7 +82,7 @@ export const updatePropertyService = async (
 
 /* ================================
    DELETE PROPERTY
-================================ */
+========================= */
 export const deletePropertyService = async (propertyId: number) => {
   const result = await db.delete(properties).where(eq(properties.id, propertyId)).returning();
   return result.length > 0;

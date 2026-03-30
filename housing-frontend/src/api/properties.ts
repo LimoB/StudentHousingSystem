@@ -1,29 +1,57 @@
-// src/api/properties.ts
 import axiosClient from "./axios";
-import { Unit } from "./units"; // Import the Unit interface we defined earlier
+import { Unit } from "./units";
 
 /* =========================
    TYPES
 ========================= */
+
+/**
+ * Enhanced Property Interface
+ * Matches the backend's relational structure.
+ */
 export interface Property {
   id: number;
   name: string;
   location: string;
   description: string | null;
-  landlordId: number;
-  status: "available" | "occupied" | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-  // Added units to the Property type to support relational data
+  /** * Matches the User's 'userId'. 
+   * This is the foreign key connecting the property to the landlord.
+   */
+  landlordId: number; 
+  status: "available" | "occupied" | "maintenance" | null;
+  createdAt: string;
+  updatedAt: string;
+  
+  // Nested data from relations
   units?: Unit[]; 
+  
+  // Optional: If backend sends aggregated stats
+  _count?: {
+    units: number;
+  };
 }
 
+/**
+ * Payload for creating/updating a property.
+ * Includes all fields allowed by the backend controller.
+ */
 export interface CreatePropertyPayload {
   name: string;
   location: string;
   description?: string;
-  landlordId?: number; // Usually handled by backend via JWT
-  status?: "available" | "occupied";
+  status?: "available" | "occupied" | "maintenance";
+}
+
+/**
+ * Standardized Backend Responses
+ */
+export interface PropertyResponse {
+  message: string;
+  property: Property;
+}
+
+export interface DeletePropertyResponse {
+  message: string;
 }
 
 /* =========================
@@ -31,41 +59,48 @@ export interface CreatePropertyPayload {
 ========================= */
 
 /**
- * Fetches all properties for the logged-in landlord.
- * The backend should return properties with their nested units.
+ * GET ALL PROPERTIES
+ * Backend Logic: 
+ * - Landlords: Returns properties where landlordId === req.user.userId
+ * - Students: Returns all 'available' properties
  */
 export const getProperties = async (): Promise<Property[]> => {
-  console.log("API: getProperties");
-  const res = await axiosClient.get("/properties");
+  const res = await axiosClient.get<Property[]>("/properties");
   return res.data;
 };
 
 /**
- * Fetches a single property by ID, including its units.
+ * GET SINGLE PROPERTY
+ * Includes nested units if the backend is configured for eager loading.
  */
 export const getPropertyById = async (id: number): Promise<Property> => {
-  console.log("API: getPropertyById", id);
-  const res = await axiosClient.get(`/properties/${id}`);
+  const res = await axiosClient.get<Property>(`/properties/${id}`);
   return res.data;
 };
 
-export const createProperty = async (data: CreatePropertyPayload): Promise<Property> => {
-  console.log("API: createProperty", data);
-  const res = await axiosClient.post("/properties", data);
+/**
+ * CREATE PROPERTY
+ */
+export const createProperty = async (data: CreatePropertyPayload): Promise<PropertyResponse> => {
+  const res = await axiosClient.post<PropertyResponse>("/properties", data);
   return res.data;
 };
 
+/**
+ * UPDATE PROPERTY
+ */
 export const updateProperty = async (
   id: number,
   data: Partial<CreatePropertyPayload>
-): Promise<Property> => {
-  console.log("API: updateProperty", id, data);
-  const res = await axiosClient.put(`/properties/${id}`, data);
+): Promise<PropertyResponse> => {
+  const res = await axiosClient.put<PropertyResponse>(`/properties/${id}`, data);
   return res.data;
 };
 
-export const deleteProperty = async (id: number): Promise<{ message: string }> => {
-  console.log("API: deleteProperty", id);
-  const res = await axiosClient.delete(`/properties/${id}`);
+/**
+ * DELETE PROPERTY
+ */
+export const deleteProperty = async (id: number): Promise<DeletePropertyResponse> => {
+  const res = await axiosClient.delete<DeletePropertyResponse>(`/properties/${id}`);
   return res.data;
 };

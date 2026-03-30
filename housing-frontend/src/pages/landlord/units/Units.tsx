@@ -1,127 +1,182 @@
-// src/pages/landlord/units/Units.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchProperties } from "../../../app/slices/propertySlice";
-import { fetchUnits } from "../../../app/slices/unitSlice"; // 1. Added Unit Thunk
+import { fetchUnits, clearUnitError } from "../../../app/slices/unitSlice";
 import { RootState, AppDispatch } from "../../../app/store";
 import UnitCard from "../../../components/UnitCard";
-import { HiOutlineSquaresPlus, HiOutlineHomeModern } from "react-icons/hi2";
-import { Link } from "react-router-dom";
+import { 
+  HiOutlineSquaresPlus, 
+  HiOutlineHomeModern, 
+  HiOutlineBuildingOffice2,
+  HiOutlineExclamationTriangle,
+  HiOutlineArrowPath 
+} from "react-icons/hi2";
+import { Link, useNavigate } from "react-router-dom";
 
 const Units: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   
-  // 2. Get both properties and units from their respective slices
   const { properties, loading: propLoading, error: propError } = useSelector((state: RootState) => state.properties);
   const { units, loading: unitLoading, error: unitError } = useSelector((state: RootState) => state.units);
+  const user = useSelector((state: RootState) => state.auth.user);
   
   const [selectedPropertyId, setSelectedPropertyId] = useState<number | "all">("all");
 
   useEffect(() => {
-    // 3. Dispatch both to ensure we have all data needed for the "Join"
     dispatch(fetchProperties());
     dispatch(fetchUnits());
+
+    return () => {
+      dispatch(clearUnitError());
+    };
   }, [dispatch]);
 
-  // 4. THE FIX: Merge units into properties locally so the UI sees them
-  const propertiesWithUnits = properties.map(property => ({
-    ...property,
-    // Map units from the unit slice that belong to this property ID
-    currentUnits: units.filter((u: any) => u.propertyId === property.id)
-  }));
+  const myProperties = useMemo(() => {
+    if (!user || !properties) return [];
+    if (user.role === 'admin') return properties;
+    
+    const currentUserId = (user as any).id || (user as any).userId;
+    return properties.filter(p => p.landlordId == currentUserId);
+  }, [properties, user]);
 
-  // Filter based on the "Tabs" selection
-  const filteredProperties = selectedPropertyId === "all" 
+  const propertiesWithUnits = useMemo(() => {
+    return myProperties.map(property => ({
+      ...property,
+      currentUnits: units.filter((u) => u.propertyId === property.id)
+    }));
+  }, [myProperties, units]);
+
+  const filteredDisplay = selectedPropertyId === "all" 
     ? propertiesWithUnits 
     : propertiesWithUnits.filter(p => p.id === selectedPropertyId);
 
   const loading = propLoading || unitLoading;
   const error = propError || unitError;
 
+  // Handler for retry button
+  const handleRefresh = () => {
+    dispatch(fetchProperties());
+    dispatch(fetchUnits());
+  };
+
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-6 md:p-10 max-w-7xl mx-auto min-h-screen bg-[#F8FAFC]">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tight">Property Units</h1>
-          <p className="text-gray-500 mt-1">Manage rooms categorized by hostel.</p>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight">Unit Inventory</h1>
+          <p className="text-gray-500 font-medium mt-1">Manage rooms for your <span className="text-blue-600 font-bold">{myProperties.length}</span> properties.</p>
         </div>
-        <Link 
-          to="/landlord/units/add"
-          className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-100"
+        
+        <button 
+          onClick={() => navigate("/landlord/units/add", { 
+            state: { propertyId: selectedPropertyId !== "all" ? selectedPropertyId : undefined } 
+          })}
+          className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-8 py-4 rounded-[1.25rem] font-bold hover:bg-blue-700 transition shadow-xl shadow-blue-100"
         >
-          <HiOutlineSquaresPlus className="w-5 h-5" />
+          <HiOutlineSquaresPlus className="w-5 h-5 stroke-[3]" />
           <span>Add New Unit</span>
-        </Link>
-      </div>
-
-      {/* Property Selector (The "Tabs") */}
-      <div className="flex flex-wrap gap-2 mb-8">
-        <button
-          onClick={() => setSelectedPropertyId("all")}
-          className={`px-5 py-2 rounded-xl font-bold transition ${
-            selectedPropertyId === "all" 
-            ? "bg-gray-900 text-white" 
-            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-          }`}
-        >
-          All Units
         </button>
-        {properties.map((prop) => (
-          <button
-            key={prop.id}
-            onClick={() => setSelectedPropertyId(prop.id)}
-            className={`px-5 py-2 rounded-xl font-bold transition ${
-              selectedPropertyId === prop.id 
-              ? "bg-blue-600 text-white" 
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {prop.name}
-          </button>
-        ))}
       </div>
 
-      {loading && (
-        <div className="flex justify-center py-10">
-           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      {/* --- ERROR DISPLAY (This uses the 'error' variable and fixes the linting issue) --- */}
+      {error && (
+        <div className="mb-8 bg-red-50 border border-red-100 p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-4">
+            <div className="bg-red-100 p-3 rounded-xl">
+              <HiOutlineExclamationTriangle className="w-6 h-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-red-900 font-black text-sm uppercase tracking-tight">Sync Error</p>
+              <p className="text-red-600 text-sm font-medium">{error}</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleRefresh}
+            className="flex items-center gap-2 bg-white border border-red-200 text-red-600 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-colors shadow-sm"
+          >
+            <HiOutlineArrowPath className="w-4 h-4" /> Retry Sync
+          </button>
         </div>
       )}
-      
-      {error && <p className="text-red-500 mb-4">{error}</p>}
 
-      {/* Grouped Display */}
-      <div className="space-y-12">
-        {filteredProperties.map((property) => (
-          <section key={property.id} className="animate-in fade-in duration-500">
-            <div className="flex items-center space-x-3 mb-6 border-b border-gray-100 pb-4">
-              <div className="bg-blue-50 p-2 rounded-lg text-blue-600">
-                <HiOutlineHomeModern className="w-6 h-6" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800">{property.name}</h2>
-              {/* Correctly count the units from our merged 'currentUnits' array */}
-              <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-black">
-                {property.currentUnits.length} Units
-              </span>
-            </div>
+      {/* Property Selector Tabs */}
+      {myProperties.length > 0 && (
+        <div className="flex flex-wrap gap-3 mb-12">
+          <button
+            onClick={() => setSelectedPropertyId("all")}
+            className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
+              selectedPropertyId === "all" ? "bg-gray-900 text-white shadow-lg" : "bg-white text-gray-400 border border-gray-100 shadow-sm"
+            }`}
+          >
+            All Units
+          </button>
+          {myProperties.map((prop) => (
+            <button
+              key={prop.id}
+              onClick={() => setSelectedPropertyId(prop.id)}
+              className={`px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
+                selectedPropertyId === prop.id ? "bg-blue-600 text-white shadow-lg" : "bg-white text-gray-400 border border-gray-100 shadow-sm"
+              }`}
+            >
+              {prop.name}
+            </button>
+          ))}
+        </div>
+      )}
 
-            {property.currentUnits && property.currentUnits.length > 0 ? (
-              <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                {property.currentUnits.map((unit: any) => (
-                  <UnitCard key={unit.id} unit={unit} />
-                ))}
+      {/* States */}
+      {loading && units.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-32">
+           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mb-6"></div>
+           <p className="text-gray-400 font-black text-xs uppercase tracking-widest">Loading Your Inventory...</p>
+        </div>
+      ) : myProperties.length === 0 && !loading ? (
+        <div className="bg-white rounded-[3rem] py-24 text-center border border-gray-100 shadow-sm">
+           <HiOutlineBuildingOffice2 className="w-16 h-16 text-gray-200 mx-auto mb-6" />
+           <h2 className="text-2xl font-black text-gray-900">No Properties Found</h2>
+           <Link to="/landlord/properties/add" className="mt-6 inline-block bg-gray-900 text-white px-8 py-4 rounded-2xl font-black text-sm">
+              Register A Property First
+           </Link>
+        </div>
+      ) : (
+        <div className="space-y-20">
+          {filteredDisplay.map((property) => (
+            <section key={property.id} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-6">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-white p-3.5 rounded-2xl text-blue-600 shadow-sm border border-gray-50">
+                    <HiOutlineHomeModern className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">{property.name}</h2>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">{property.location}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-gray-900 text-xl font-black">{property.currentUnits.length}</span>
+                  <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Managed Units</p>
+                </div>
               </div>
-            ) : (
-              <div className="bg-gray-50 rounded-2xl p-10 text-center border-2 border-dashed border-gray-200">
-                <p className="text-gray-400 font-medium">No units found for this property.</p>
-                <Link to="/landlord/units/add" className="text-blue-600 font-bold text-sm mt-2 inline-block">
-                  + Add first unit to {property.name}
-                </Link>
-              </div>
-            )}
-          </section>
-        ))}
-      </div>
+
+              {property.currentUnits.length > 0 ? (
+                <div className="grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                  {property.currentUnits.map((unit) => (
+                    <UnitCard key={unit.id} unit={unit} />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-gray-50/50 rounded-[2.5rem] py-16 text-center border-2 border-dashed border-gray-200">
+                  <Link to="/landlord/units/add" state={{ propertyId: property.id }} className="text-blue-600 font-black text-sm hover:underline">
+                    + Add first unit for {property.name}
+                  </Link>
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

@@ -14,6 +14,22 @@ export interface Payment {
   checkoutRequestID: string;
   mpesaReceiptNumber?: string;
   createdAt: string;
+  // Added nested relations for Landlord/Admin views
+  student?: {
+    fullName: string;
+    email: string;
+  };
+  booking?: {
+    id: number;
+    status: string;
+    unit?: {
+      unitNumber: string;
+      property?: {
+        title: string;
+        location: string;
+      }
+    }
+  };
 }
 
 export interface STKPushPayload {
@@ -37,7 +53,7 @@ export interface STKPushResponse {
 // INITIATE STK PUSH
 export const initiateSTKPush = async (data: STKPushPayload): Promise<STKPushResponse> => {
   const res = await axiosClient.post("/payments/stkpush", data);
-  // Backend returns: { message: "...", data: { ... } }
+  // Matches backend: res.status(200).json({ ..., data: result })
   return res.data.data; 
 };
 
@@ -47,7 +63,7 @@ export const checkPaymentStatus = async (checkoutID: string): Promise<{ status: 
   return res.data;
 };
 
-// GET PAYMENTS (Filters by studentId on backend via JWT)
+// GET PAYMENTS (Now context-aware: Student gets theirs, Landlord gets their property payments)
 export const getPayments = async (): Promise<Payment[]> => {
   const res = await axiosClient.get("/payments");
   return res.data;

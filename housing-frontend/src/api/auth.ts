@@ -20,16 +20,18 @@ export interface LoginRequest {
 }
 
 /**
- * UPDATED: Added userId to match your backend payload 
- * and your Redux slice expectations.
+ * FINALIZED USER INTERFACE
+ * Standardized to match both the backend response (id) 
+ * and existing frontend logic (userId).
  */
 export interface User {
-  userId: number; // Primary key used in your frontend logic
-  id?: number;    // Optional, in case some endpoints return 'id'
+  id: number;         // Primary key (Required to fix TS error)
+  userId?: number;    // Secondary/Alias key used in some frontend logic
   fullName: string;
   email: string;
   phone?: string;
   role: UserRole;
+  createdAt?: string; // Added since it appeared in your console logs
 }
 
 export interface AuthResponse {

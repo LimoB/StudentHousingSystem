@@ -1,17 +1,19 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import {
   getUnits,
   getUnitsByProperty,
   createUnit,
   updateUnit,
   deleteUnit,
+  Unit,
+  CreateUnitPayload
 } from "../../api/units";
 
 /* =========================
    STATE
 ========================= */
 interface UnitState {
-  units: any[];
+  units: Unit[];
   loading: boolean;
   error: string | null;
 }
@@ -25,6 +27,7 @@ const initialState: UnitState = {
 /* =========================
    THUNKS
 ========================= */
+
 export const fetchUnits = createAsyncThunk(
   "units/fetchAll",
   async (_, thunkAPI) => {
@@ -49,7 +52,7 @@ export const fetchUnitsByProperty = createAsyncThunk(
 
 export const createUnitAction = createAsyncThunk(
   "units/create",
-  async (payload: any, thunkAPI) => {
+  async (payload: CreateUnitPayload, thunkAPI) => {
     try {
       return await createUnit(payload);
     } catch (error: any) {
@@ -60,9 +63,10 @@ export const createUnitAction = createAsyncThunk(
 
 export const updateUnitAction = createAsyncThunk(
   "units/update",
-  async ({ id, data }: { id: number; data: any }, thunkAPI) => {
+  async ({ id, data }: { id: number; data: Partial<CreateUnitPayload> }, thunkAPI) => {
     try {
-      return await updateUnit(id, data);
+      await updateUnit(id, data);
+      return { id, updates: data }; 
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to update unit");
     }
@@ -91,7 +95,6 @@ const unitSlice = createSlice({
     clearUnitError: (state) => {
       state.error = null;
     },
-    // Action to clear units when navigating away or switching views
     resetUnits: (state) => {
       state.units = [];
       state.loading = false;
@@ -100,61 +103,39 @@ const unitSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      /* FETCH ALL */
       .addCase(fetchUnits.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchUnits.fulfilled, (state, action) => {
+      .addCase(fetchUnits.fulfilled, (state, action: PayloadAction<Unit[]>) => {
         state.loading = false;
-        state.units = Array.isArray(action.payload) ? action.payload : [];
+        state.units = action.payload;
       })
       .addCase(fetchUnits.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })
-
-      /* FETCH BY PROPERTY */
-      .addCase(fetchUnitsByProperty.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchUnitsByProperty.fulfilled, (state, action) => {
+      .addCase(fetchUnitsByProperty.fulfilled, (state, action: PayloadAction<Unit[]>) => {
         state.loading = false;
-        const incomingUnits = Array.isArray(action.payload) ? action.payload : [];
-        
-        // Filter out existing units that belong to the SAME property we just fetched 
-        // to avoid duplicates, while keeping units from other properties if needed.
+        const incomingUnits = action.payload;
         const otherUnits = state.units.filter(
           (existing) => !incomingUnits.some((incoming) => incoming.id === existing.id)
         );
-        
         state.units = [...otherUnits, ...incomingUnits];
       })
-      .addCase(fetchUnitsByProperty.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
-
-      /* CREATE */
       .addCase(createUnitAction.fulfilled, (state, action) => {
         state.loading = false;
+        // Adjusted to handle backend returning { message, unit }
         const newUnit = action.payload.unit || action.payload;
-        if (newUnit) state.units.push(newUnit);
+        if (newUnit) state.units.unshift(newUnit); 
       })
-
-      /* UPDATE */
       .addCase(updateUnitAction.fulfilled, (state, action) => {
         state.loading = false;
-        const updatedUnit = action.payload.unit || action.payload;
-        if (updatedUnit) {
-            state.units = state.units.map((u) =>
-                u.id === updatedUnit.id ? updatedUnit : u
-            );
-        }
+        const { id, updates } = action.payload;
+        state.units = state.units.map((u) =>
+          u.id === id ? { ...u, ...updates } : u
+        );
       })
-
-      /* DELETE */
       .addCase(deleteUnitAction.fulfilled, (state, action) => {
         state.loading = false;
         state.units = state.units.filter((u) => u.id !== action.payload);

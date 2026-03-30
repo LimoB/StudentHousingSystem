@@ -11,13 +11,21 @@ import {
    TYPES
 ========================= */
 
-// Define the User interface locally to ensure userId is present
 export interface User {
-  userId: number; // Added explicitly to fix ts(2339)
+  userId: number; 
   fullName: string;
   email: string;
   role: "student" | "admin" | "landlord";
   phone?: string;
+}
+
+// Interface to handle backend error shapes without using 'any'
+interface ApiError {
+  response?: {
+    data?: {
+      error?: string;
+    };
+  };
 }
 
 interface AuthState {
@@ -31,12 +39,11 @@ interface AuthState {
    INITIAL STATE
 ========================= */
 
-// Helper to get initial state from localStorage safely
 const getStoredUser = (): User | null => {
   const stored = localStorage.getItem("user");
   if (!stored) return null;
   try {
-    return JSON.parse(stored);
+    return JSON.parse(stored) as User;
   } catch {
     return null;
   }
@@ -58,13 +65,14 @@ export const login = createAsyncThunk(
   async (credentials: LoginRequest, thunkAPI) => {
     try {
       const data = await loginUser(credentials);
-      // Persist to disk
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       return data as AuthResponse;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // Cast the unknown error to our ApiError interface safely
+      const err = error as ApiError;
       return thunkAPI.rejectWithValue(
-        error.response?.data?.error || "Login failed"
+        err.response?.data?.error || "Login failed"
       );
     }
   }
@@ -75,13 +83,13 @@ export const register = createAsyncThunk(
   async (payload: RegisterRequest, thunkAPI) => {
     try {
       const data = await registerUser(payload);
-      // Persist to disk
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
       return data as AuthResponse;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as ApiError;
       return thunkAPI.rejectWithValue(
-        error.response?.data?.error || "Registration failed"
+        err.response?.data?.error || "Registration failed"
       );
     }
   }
@@ -96,15 +104,12 @@ const authSlice = createSlice({
   initialState,
   reducers: {
     logout(state) {
-      // Clear disk
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-      // Clear memory
       state.user = null;
       state.token = null;
       state.error = null;
     },
-    // Useful for clearing errors when switching between Login/Register forms
     clearAuthError(state) {
       state.error = null;
     }
@@ -118,7 +123,6 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
         state.loading = false;
-        // Cast to our User type which has userId
         state.user = action.payload.user as User;
         state.token = action.payload.token;
       })
