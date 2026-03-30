@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import db from "../drizzle/db";
 import { 
   leases, 
@@ -7,6 +7,7 @@ import {
   users, 
   TLeaseInsert 
 } from "../drizzle/schema";
+import { createNotificationService } from "../notifications/notification.service";
 
 // Helper for type-broken environments
 const l = leases as any;
@@ -15,7 +16,7 @@ const p = properties as any;
 const s = users as any;
 
 /* ================================
-   GET LANDLORD LEASES (Secure & Fixed)
+   GET LANDLORD LEASES
 ================================ */
 export const getLandlordLeasesService = async (landlordId: number) => {
   const result = await db
@@ -36,9 +37,9 @@ export const getLandlordLeasesService = async (landlordId: number) => {
     .innerJoin(s, eq(l.studentId, s.id))
     .innerJoin(u, eq(l.unitId, u.id))
     .innerJoin(p, eq(u.propertyId, p.id))
-    .where(eq(p.landlordId, landlordId));
+    .where(eq(p.landlordId, landlordId))
+    .orderBy(desc(l.createdAt));
 
-  // Map back to the nested structure for the frontend
   return result.map((row) => ({
     id: row.id,
     startDate: row.startDate,
@@ -70,7 +71,8 @@ export const getLeasesService = async () => {
       unit: {
         with: { property: { columns: { name: true, location: true } } }
       }
-    }
+    },
+    orderBy: [desc(leases.createdAt)]
   });
 };
 
@@ -84,7 +86,8 @@ export const getStudentLeasesService = async (studentId: number) => {
       unit: {
         with: { property: { columns: { name: true, location: true } } }
       }
-    }
+    },
+    orderBy: [desc(leases.createdAt)]
   });
 };
 
@@ -95,9 +98,14 @@ export const getLeaseByIdService = async (leaseId: number) => {
   return await db.query.leases.findFirst({
     where: eq(leases.id, leaseId),
     with: {
-      student: { columns: { fullName: true, email: true } },
+      student: { columns: { id: true, fullName: true, email: true } },
       unit: {
-        with: { property: { columns: { name: true } } }
+        columns: { unitNumber: true }, // Added unitNumber
+        with: { 
+          property: { 
+            columns: { name: true, landlordId: true } // Added landlordId here!
+          } 
+        }
       }
     }
   });
@@ -108,15 +116,41 @@ export const getLeaseByIdService = async (leaseId: number) => {
 ================================ */
 export const createLeaseService = async (lease: TLeaseInsert) => {
   const result = await db.insert(leases).values(lease).returning();
-  return result[0];
+  const newLease = result[0];
+
+  // Fetch full details (now including landlordId)
+  const details = await getLeaseByIdService(newLease.id);
+
+  if (details && (details as any).unit?.property) {
+    const d = details as any;
+    
+    // 1. Notify Student
+    await createNotificationService({
+      userId: d.studentId,
+      title: "Lease Agreement Ready 📝",
+      message: `Your lease for ${d.unit.property.name}, Unit ${d.unit.unitNumber} is now active.`,
+      type: "info",
+      link: `/student/leases/${newLease.id}` 
+    });
+
+    // 2. Notify Landlord
+    await createNotificationService({
+      userId: d.unit.property.landlordId, // This now exists!
+      title: "New Lease Registered 🏠",
+      message: `A new lease has been generated for ${d.unit.property.name} (Unit ${d.unit.unitNumber}).`,
+      type: "info",
+      link: `/landlord/leases`
+    });
+  }
+
+  return newLease;
 };
 
 /* ================================
-   END LEASE (Updated with Unit Release)
+   END LEASE
 ================================ */
 export const endLeaseService = async (leaseId: number) => {
   return await db.transaction(async (tx) => {
-    // 1. Update lease status
     const [updatedLease] = await (tx as any)
       .update(leases)
       .set({ status: "ended" })
@@ -125,11 +159,19 @@ export const endLeaseService = async (leaseId: number) => {
 
     if (!updatedLease) throw new Error("Lease not found");
 
-    // 2. Make the unit available for booking again
     await (tx as any)
       .update(units)
       .set({ isAvailable: true })
       .where(eq(units.id, updatedLease.unitId));
+
+    // Notify Student using correct student route
+    await createNotificationService({
+      userId: updatedLease.studentId,
+      title: "Lease Ended 🏁",
+      message: `Your lease has officially ended. Thank you for staying with us!`,
+      type: "info",
+      link: "/student/leases"
+    });
 
     return "Lease ended and unit is now available";
   });

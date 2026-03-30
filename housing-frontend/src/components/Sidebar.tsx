@@ -21,9 +21,9 @@ interface SidebarProps {
 const Sidebar = ({ role }: SidebarProps) => {
   const location = useLocation();
   
-  // Get notifications to show count in the sidebar
+  // 1. Updated to match the 'isRead' property from your Backend/Slice
   const { notifications } = useSelector((state: RootState) => state.notifications);
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const menus = {
     student: [
@@ -31,7 +31,7 @@ const Sidebar = ({ role }: SidebarProps) => {
       { title: "Properties", path: "properties", icon: <FaBuilding /> },
       { title: "Bookings", path: "bookings", icon: <FaBook /> },
       { title: "Payments", path: "payments", icon: <FaMoneyBillWave /> },
-      { title: "Leases", path: "leases", icon: <FaFileContract /> }, // Fixed Icon
+      { title: "Leases", path: "leases", icon: <FaFileContract /> },
       { title: "Maintenance", path: "maintenance", icon: <FaTools /> },
       { title: "Notifications", path: "notifications", icon: <FaBell />, badge: unreadCount },
     ],
@@ -42,8 +42,10 @@ const Sidebar = ({ role }: SidebarProps) => {
       { title: "Units", path: "units", icon: <FaDoorOpen /> },
       { title: "Bookings", path: "bookings", icon: <FaBook /> },
       { title: "Payments", path: "payments", icon: <FaMoneyBillWave /> },
-      { title: "Leases", path: "leases", icon: <FaFileContract /> }, // Fixed Icon
+      { title: "Leases", path: "leases", icon: <FaFileContract /> },
       { title: "Maintenance", path: "maintenance", icon: <FaTools /> },
+      // Added Notifications for Landlords (Crucial for the "Linked" system)
+      { title: "Notifications", path: "notifications", icon: <FaBell />, badge: unreadCount },
     ],
 
     admin: [
@@ -53,7 +55,7 @@ const Sidebar = ({ role }: SidebarProps) => {
       { title: "Units", path: "units", icon: <FaDoorOpen /> },
       { title: "Bookings", path: "bookings", icon: <FaBook /> },
       { title: "Payments", path: "payments", icon: <FaMoneyBillWave /> },
-      { title: "Leases", path: "leases", icon: <FaFileContract /> }, // Fixed Icon
+      { title: "Leases", path: "leases", icon: <FaFileContract /> },
       { title: "Maintenance", path: "maintenance", icon: <FaTools /> },
       { title: "Notifications", path: "notifications", icon: <FaBell />, badge: unreadCount },
       { title: "Reports", path: "reports", icon: <FaFileAlt /> },
@@ -62,7 +64,6 @@ const Sidebar = ({ role }: SidebarProps) => {
 
   return (
     <aside className="w-72 bg-white border-r border-gray-100 flex flex-col h-screen sticky top-0">
-      {/* Branding - Hidden if Navbar handles it, but kept for Layout structure */}
       <div className="p-8 pb-4">
         <div className="flex items-center gap-3 px-2">
           <div className="w-10 h-10 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
@@ -80,7 +81,8 @@ const Sidebar = ({ role }: SidebarProps) => {
         
         {menus[role].map((menu) => {
           const fullPath = `/${role}/${menu.path}`;
-          const isActive = location.pathname.startsWith(fullPath);
+          // Better path matching to avoid highlighting "Dashboard" when on "Dashboard/Stats"
+          const isActive = location.pathname === fullPath || location.pathname.startsWith(`${fullPath}/`);
 
           return (
             <Link
@@ -101,9 +103,11 @@ const Sidebar = ({ role }: SidebarProps) => {
                 </span>
               </div>
 
-              {/* Sidebar Notification Badge */}
-              {menu.badge !== undefined && menu.badge > 0 && !isActive && (
-                <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full ring-4 ring-white shadow-sm">
+              {/* Enhanced Sidebar Notification Badge */}
+              {menu.badge !== undefined && menu.badge > 0 && (
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ring-4 shadow-sm transition-colors duration-300 ${
+                  isActive ? "bg-white text-blue-600 ring-blue-500" : "bg-red-500 text-white ring-white"
+                }`}>
                   {menu.badge}
                 </span>
               )}
@@ -112,7 +116,6 @@ const Sidebar = ({ role }: SidebarProps) => {
         })}
       </nav>
 
-      {/* Sidebar Footer / Quick Support */}
       <div className="p-6">
         <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100">
           <p className="text-xs font-black text-gray-900 mb-1 uppercase tracking-tighter">Need Help?</p>

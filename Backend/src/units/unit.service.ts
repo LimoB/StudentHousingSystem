@@ -1,6 +1,7 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import db from "../drizzle/db";
 import { units, properties } from "../drizzle/schema";
+import { createNotificationService } from "../notifications/notification.service";
 
 export type TUnitInsert = typeof units.$inferInsert;
 
@@ -8,25 +9,24 @@ export type TUnitInsert = typeof units.$inferInsert;
    GET UNITS (Admin = All, Landlord = Filtered)
 ================================ */
 export const getUnitsService = async (landlordId?: number) => {
-  // If no landlordId is provided, it's an Admin request: Return all units
   if (!landlordId) {
     return await db.query.units.findMany({
       with: {
         property: {
           columns: { name: true, location: true, landlordId: true }
         }
-      }
+      },
+      orderBy: [desc(units.createdAt)]
     });
   }
 
-  // Otherwise, filter by landlordId via existence check in properties table
   return await db.query.units.findMany({
-    where: (units, { exists }) => exists(
+    where: (u, { exists }) => exists(
       db.select()
         .from(properties)
         .where(
           and(
-            eq(properties.id, units.propertyId),
+            eq(properties.id, u.propertyId),
             eq(properties.landlordId, landlordId)
           )
         )
@@ -35,7 +35,8 @@ export const getUnitsService = async (landlordId?: number) => {
       property: {
         columns: { name: true, location: true, landlordId: true }
       }
-    }
+    },
+    orderBy: [desc(units.createdAt)]
   });
 };
 
@@ -51,12 +52,7 @@ export const getUnitByIdService = async (unitId: number, landlordId?: number) =>
   });
 
   if (!result) return null;
-
-  // If landlordId is provided (Landlord), check ownership. 
-  // If undefined (Admin), bypass.
-  if (landlordId && result.property.landlordId !== landlordId) {
-    return null; 
-  }
+  if (landlordId && result.property.landlordId !== landlordId) return null; 
   
   return result;
 };
@@ -65,7 +61,6 @@ export const getUnitByIdService = async (unitId: number, landlordId?: number) =>
    GET UNITS BY PROPERTY (Secure)
 ================================ */
 export const getUnitsByPropertyService = async (propertyId: number, landlordId?: number) => {
-  // If landlordId is provided, verify ownership first
   if (landlordId) {
     const propertyOwner = await db.query.properties.findFirst({
       where: and(eq(properties.id, propertyId), eq(properties.landlordId, landlordId))
@@ -73,27 +68,42 @@ export const getUnitsByPropertyService = async (propertyId: number, landlordId?:
     if (!propertyOwner) return [];
   }
 
-  // Admin or verified Landlord proceeds to fetch units
   return await db.query.units.findMany({
     where: eq(units.propertyId, propertyId),
     with: {
-      property: {
-        columns: { name: true, location: true }
-      }
+      property: { columns: { name: true, location: true, landlordId: true } }
     }
   });
 };
 
 /* ================================
-   CREATE UNIT
+   CREATE UNIT (Notification Added)
 ================================ */
 export const createUnitService = async (unit: TUnitInsert) => {
   const result = await db.insert(units).values(unit).returning();
-  return result[0];
+  const newUnit = result[0];
+
+  // Fetch property details to get the landlordId
+  const property = await db.query.properties.findFirst({
+    where: eq(properties.id, newUnit.propertyId)
+  });
+
+  if (property) {
+    await createNotificationService({
+      userId: property.landlordId,
+      title: "New Unit Added 🚪",
+      message: `Unit ${newUnit.unitNumber} has been added to ${property.name}.`,
+      type: "info",
+      // UPDATED LINK
+      link: `/landlord/units`
+    });
+  }
+
+  return newUnit;
 };
 
 /* ================================
-   UPDATE UNIT
+   UPDATE UNIT (Notification Added)
 ================================ */
 export const updateUnitService = async (
   unitId: number,
@@ -106,6 +116,24 @@ export const updateUnitService = async (
     .returning();
 
   if (!result.length) throw new Error("Unit not found");
+  const updatedUnit = result[0];
+
+  // Fetch property context for the notification
+  const property = await db.query.properties.findFirst({
+    where: eq(properties.id, updatedUnit.propertyId)
+  });
+
+  if (property) {
+    await createNotificationService({
+      userId: property.landlordId,
+      title: "Unit Updated 📝",
+      message: `Unit ${updatedUnit.unitNumber} in ${property.name} has been updated.`,
+      type: "info",
+      // UPDATED LINK
+      link: `/landlord/units`
+    });
+  }
+
   return "Unit updated successfully";
 };
 

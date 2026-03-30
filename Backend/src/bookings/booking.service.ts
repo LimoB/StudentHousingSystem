@@ -1,6 +1,7 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import db from "../drizzle/db";
-import { bookings, units } from "../drizzle/schema";
+import { bookings, units, properties } from "../drizzle/schema";
+import { createNotificationService } from "../notifications/notification.service";
 
 export type TBookingInsert = typeof bookings.$inferInsert;
 export type TBookingSelect = typeof bookings.$inferSelect;
@@ -15,15 +16,14 @@ export const getBookingsService = async () => {
       unit: { with: { property: true } },
       payments: true
     },
+    orderBy: [desc(bookings.createdAt)]
   });
 };
 
 /* ================================
    GET LANDLORD BOOKINGS SERVICE
-   Filters bookings where the unit belongs to a property owned by the landlord.
 ================================ */
 export const getLandlordBookingsService = async (landlordId: number) => {
-  // If landlordId is NaN or undefined, returning an empty array avoids a 400 DB error
   if (!landlordId || isNaN(landlordId)) return [];
 
   const allBookings = await db.query.bookings.findMany({
@@ -31,14 +31,12 @@ export const getLandlordBookingsService = async (landlordId: number) => {
       student: true,
       payments: true,
       unit: {
-        with: {
-          property: true
-        }
+        with: { property: true }
       }
     },
+    orderBy: [desc(bookings.createdAt)]
   });
 
-  // Added extra safety checks to ensure we don't call .landlordId on a null property
   return allBookings.filter(booking => {
     const property = (booking.unit as any)?.property;
     return property && Number(property.landlordId) === Number(landlordId);
@@ -56,7 +54,8 @@ export const getStudentBookingsService = async (studentId: number) => {
     with: {
       unit: { with: { property: true } },
       payments: true
-    }
+    },
+    orderBy: [desc(bookings.createdAt)]
   });
 };
 
@@ -64,16 +63,14 @@ export const getStudentBookingsService = async (studentId: number) => {
    GET BOOKING BY ID
 ================================ */
 export const getBookingByIdService = async (bookingId: number) => {
-  const booking = await db.query.bookings.findFirst({
+  return await db.query.bookings.findFirst({
     where: eq(bookings.id, bookingId),
     with: {
       student: true,
       unit: { with: { property: true } },
       payments: true
     }
-  });
-
-  return booking ?? null;
+  }) ?? null;
 };
 
 /* ================================
@@ -83,6 +80,11 @@ export const createBookingService = async (booking: TBookingInsert): Promise<any
   // 1. Availability Check
   const unit = await db.query.units.findFirst({
     where: eq(units.id, booking.unitId),
+    with: { 
+      property: {
+        columns: { landlordId: true, name: true } // Explicitly select for notification
+      } 
+    }
   });
 
   if (!unit || !unit.isAvailable) {
@@ -100,14 +102,41 @@ export const createBookingService = async (booking: TBookingInsert): Promise<any
 
   if (existing) return await getBookingByIdService(existing.id);
 
-  // 3. Create
+  // 3. Create Booking
   const result = await db.insert(bookings).values(booking).returning();
-  return await getBookingByIdService(result[0].id);
+  const newBooking = await getBookingByIdService(result[0].id);
+
+  // 4. NOTIFICATIONS
+  if (newBooking && unit.property) {
+    const d = newBooking as any;
+
+    // --- Notify LANDLORD: Someone wants to move in ---
+    await createNotificationService({
+      userId: unit.property.landlordId,
+      title: "New Booking Request 🏠",
+      message: `${d.student.fullName} has requested to book Unit ${unit.unitNumber} at ${unit.property.name}.`,
+      type: "booking",
+      // SYNCED: Matches <Route path="bookings" /> in LandlordRoutes.tsx
+      link: "/landlord/bookings" 
+    });
+
+    // --- Notify STUDENT: Confirmation of request ---
+    await createNotificationService({
+      userId: d.studentId,
+      title: "Booking Request Sent 🚀",
+      message: `Your request for ${unit.property.name} (Unit ${unit.unitNumber}) is pending approval.`,
+      type: "booking",
+      // SYNCED: Matches <Route path="bookings/:id" /> in StudentRoutes.tsx
+      link: `/student/bookings/${d.id}`
+    });
+  }
+
+  return newBooking;
 };
 
 /* ================================
    UPDATE BOOKING STATUS SERVICE
-================================ */
+=============================== */
 export const updateBookingStatusService = async (
   bookingId: number,
   status: "pending" | "approved" | "rejected" | "paid" | "confirmed"
@@ -118,6 +147,34 @@ export const updateBookingStatusService = async (
     .returning();
 
   if (!result.length) throw new Error("Booking not found");
+
+  // Fetch full details to get the studentId and unit info for the notification
+  const fullBooking = await getBookingByIdService(bookingId);
+
+  if (fullBooking) {
+    let title = "Booking Update";
+    let message = `Your booking status has been updated to ${status}.`;
+    let type = "info";
+
+    if (status === "approved") {
+      title = "Booking Approved! 🎉";
+      message = `Your request for ${fullBooking.unit.unitNumber} was approved. Please proceed to payment.`;
+      type = "booking";
+    } else if (status === "rejected") {
+      title = "Booking Rejected ❌";
+      message = `Sorry, your request for ${fullBooking.unit.unitNumber} was not accepted.`;
+      type = "error";
+    }
+
+    // NOTIFY STUDENT
+    await createNotificationService({
+      userId: fullBooking.studentId,
+      title,
+      message,
+      type,
+      link: "/dashboard/my-bookings"
+    });
+  }
 
   return `Booking status updated to ${status}`;
 };

@@ -1,18 +1,17 @@
-// src/app/slices/notificationSlice.ts
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import {
   getNotifications,
   getMyNotifications,
-  createNotification,
   markAsRead,
   deleteNotification,
+  Notification,
 } from "../../api/notifications";
 
 /* =========================
    STATE
 ========================= */
 interface NotificationState {
-  notifications: any[];
+  notifications: Notification[];
   loading: boolean;
   error: string | null;
 }
@@ -26,13 +25,14 @@ const initialState: NotificationState = {
 /* =========================
    THUNKS
 ========================= */
+
 export const fetchNotifications = createAsyncThunk(
   "notifications/fetchAll",
   async (_, thunkAPI) => {
     try {
       return await getNotifications();
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch");
     }
   }
 );
@@ -43,18 +43,7 @@ export const fetchMyNotifications = createAsyncThunk(
     try {
       return await getMyNotifications();
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
-    }
-  }
-);
-
-export const createNotificationAction = createAsyncThunk(
-  "notifications/create",
-  async (payload: any, thunkAPI) => {
-    try {
-      return await createNotification(payload);
-    } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch");
     }
   }
 );
@@ -66,7 +55,7 @@ export const markNotificationAsRead = createAsyncThunk(
       await markAsRead(id);
       return id;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Action failed");
     }
   }
 );
@@ -78,7 +67,7 @@ export const deleteNotificationAction = createAsyncThunk(
       await deleteNotification(id);
       return id;
     } catch (error: any) {
-      return thunkAPI.rejectWithValue(error.response.data.message);
+      return thunkAPI.rejectWithValue(error.response?.data?.message || "Delete failed");
     }
   }
 );
@@ -89,14 +78,18 @@ export const deleteNotificationAction = createAsyncThunk(
 const notificationSlice = createSlice({
   name: "notifications",
   initialState,
-  reducers: {},
+  reducers: {
+    clearNotificationError: (state) => {
+      state.error = null;
+    }
+  },
   extraReducers: (builder) => {
     builder
-      /* FETCH ALL */
+      /* FETCH ALL (ADMIN) */
       .addCase(fetchNotifications.pending, (state) => {
         state.loading = true;
       })
-      .addCase(fetchNotifications.fulfilled, (state, action) => {
+      .addCase(fetchNotifications.fulfilled, (state, action: PayloadAction<Notification[]>) => {
         state.loading = false;
         state.notifications = action.payload;
       })
@@ -106,21 +99,21 @@ const notificationSlice = createSlice({
       })
 
       /* FETCH MY NOTIFICATIONS */
-      .addCase(fetchMyNotifications.fulfilled, (state, action) => {
-        state.notifications = action.payload;
+      .addCase(fetchMyNotifications.pending, (state) => {
+        state.loading = true;
       })
-
-      /* CREATE */
-      .addCase(createNotificationAction.fulfilled, (state, action) => {
-        state.notifications.push(action.payload.notification);
+      .addCase(fetchMyNotifications.fulfilled, (state, action: PayloadAction<Notification[]>) => {
+        state.loading = false;
+        state.notifications = action.payload;
       })
 
       /* MARK AS READ */
       .addCase(markNotificationAsRead.fulfilled, (state, action) => {
         const id = action.payload;
-        state.notifications = state.notifications.map((n) =>
-          n.id === id ? { ...n, read: true } : n
-        );
+        const index = state.notifications.findIndex((n) => n.id === id);
+        if (index !== -1) {
+          state.notifications[index].isRead = true;
+        }
       })
 
       /* DELETE */
@@ -132,4 +125,5 @@ const notificationSlice = createSlice({
   },
 });
 
+export const { clearNotificationError } = notificationSlice.actions;
 export default notificationSlice.reducer;

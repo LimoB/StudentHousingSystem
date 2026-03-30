@@ -5,19 +5,19 @@ import AdminDashboard from "../pages/admin/dashboard/AdminDashboard";
 import Reports from "../pages/admin/reports/Reports";
 import Users from "../pages/admin/users/Users";
 
-// Shared Logic Components (The "Engine")
+// Shared Logic Components
 import Bookings from "../components/Bookings";
 import Leases from "../components/Leases";
 import PaymentDashboard from "../components/PaymentDashboard"; 
 import MaintenanceRequests from "../components/maintenance/MaintenanceRequests";
 import Notifications from "../components/Notifications"; 
 
-// Property & Unit Management (Shared Engine - Refactored)
+// Property & Unit Management
 import Properties from "../components/properties/Properties";
 import PropertyDetail from "../components/PropertyDetail"; 
-import PropertyEdit from "../components/properties/PropertyEdit"; // Matches Landlord
+import PropertyEdit from "../components/properties/PropertyEdit"; 
 import Units from "../components/units/Units";
-import UnitManagement from "../components/units/UnitManagement"; // Matches Landlord
+import UnitManagement from "../components/units/UnitManagement";
 
 const AdminRoutes = () => {
   return (
@@ -28,7 +28,7 @@ const AdminRoutes = () => {
       <Route path="reports" element={<Reports />} />
       <Route path="notifications" element={<Notifications />} />
 
-      {/* Shared Management Operations */}
+      {/* Operations Management */}
       <Route path="bookings" element={<Bookings />} />
       <Route path="leases" element={<Leases />} />
       <Route path="payments" element={<PaymentDashboard />} /> 
@@ -36,12 +36,9 @@ const AdminRoutes = () => {
       
       {/* Property System Control */}
       <Route path="properties" element={<Properties />} />
-      <Route path="properties/:id" element={<PropertyDetail />} />
-      
-      {/* Admin needs these routes so the "Inspect" buttons work, 
-          even if the UI mostly directs them to PropertyDetail */}
       <Route path="properties/add" element={<PropertyEdit />} />
       <Route path="properties/edit/:id" element={<PropertyEdit />} />
+      <Route path="properties/:id" element={<PropertyDetail />} />
       
       {/* Unit System Control */}
       <Route path="units" element={<Units />} />

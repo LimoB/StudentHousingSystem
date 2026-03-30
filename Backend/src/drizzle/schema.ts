@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { InferInsertModel, relations } from "drizzle-orm";
 import {
   pgTable,
   varchar,
@@ -150,9 +150,12 @@ export const maintenanceRequests = pgTable("maintenance_requests", {
 export const notifications = pgTable("notifications", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("user_id")
-    .references(() => users.id)
+    .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
+  title: varchar("title", { length: 100 }), // e.g., "New Booking Request"
   message: text("message").notNull(),
+  type: varchar("type", { length: 50 }).default("info"), // e.g., "payment", "booking", "maintenance"
+  link: text("link"), // e.g., "/dashboard/bookings/5"
   isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at").defaultNow()
 });
@@ -175,6 +178,24 @@ export type TPaymentSelect = typeof payments.$inferSelect;
 // Add this line
 export type TLeaseInsert = typeof leases.$inferInsert;
 export type TLeaseSelect = typeof leases.$inferSelect;
+
+
+// 3. Export the Types
+export type TProperty = typeof properties.$inferSelect;
+export type TUnit = typeof units.$inferSelect;
+export type TBooking = typeof bookings.$inferSelect;
+export type TPayment = typeof payments.$inferSelect;
+export type TLease = typeof leases.$inferSelect;
+export type TMaintenanceRequest = typeof maintenanceRequests.$inferSelect;
+export type TNotification = typeof notifications.$inferSelect;
+
+/* ================================
+   INSERT TYPES (For Creating Records)
+================================== */
+
+export type TUnitInsert = typeof units.$inferInsert;
+export type TBookingInsert = typeof bookings.$inferInsert;    
+export type TPropertyInsert = typeof properties.$inferInsert; // For inserting
 
 /* ================================
    RELATIONS

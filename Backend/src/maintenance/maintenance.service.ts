@@ -1,4 +1,4 @@
-import { eq, desc, and, SQL } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import db from "../drizzle/db";
 import { 
   maintenanceRequests, 
@@ -7,8 +7,9 @@ import {
   users 
 } from "../drizzle/schema";
 import { PgTable } from "drizzle-orm/pg-core";
+import { createNotificationService } from "../notifications/notification.service";
 
-// 1. Cast tables to unknown first, then to PgTable to break the "protected" conflict
+// 1. Keep your working casts to break the "protected" conflict
 const m = maintenanceRequests as any;
 const u = units as unknown as PgTable<any>;
 const p = properties as unknown as PgTable<any>;
@@ -18,13 +19,10 @@ export type TMRequestInsert = typeof maintenanceRequests.$inferInsert;
 
 /* ================================
    GET LANDLORD REQUESTS (Relational API)
-   Filters maintenance by units owned by the landlord
 ================================ */
 export const getLandlordMaintenanceRequestsService = async (landlordId: number) => {
-  // Use the relational API to avoid manual join column mapping issues
   const results = await db.query.maintenanceRequests.findMany({
     where: (maintenance, { exists }) => 
-      // We use the casted variables (u, p) here to avoid the TS error
       exists(
         db.select()
           .from(u)
@@ -37,26 +35,12 @@ export const getLandlordMaintenanceRequestsService = async (landlordId: number) 
           )
       ),
     with: {
-      student: { 
-        columns: { 
-          fullName: true, 
-          phone: true 
-        } 
-      },
+      student: { columns: { fullName: true, phone: true } },
       unit: {
-        columns: { 
-          unitNumber: true 
-        },
-        with: {
-          property: { 
-            columns: { 
-              name: true 
-            } 
-          }
-        }
+        columns: { unitNumber: true },
+        with: { property: { columns: { name: true } } }
       }
     },
-    // We use the original maintenanceRequests object here for the sort
     orderBy: [desc(maintenanceRequests.createdAt)]
   });
 
@@ -71,9 +55,7 @@ export const getMaintenanceRequestsService = async () => {
     with: {
       student: { columns: { fullName: true, phone: true } },
       unit: {
-        with: {
-          property: { columns: { name: true } }
-        },
+        with: { property: { columns: { name: true } } },
         columns: { unitNumber: true }
       }
     },
@@ -88,9 +70,13 @@ export const getMaintenanceRequestByIdService = async (requestId: number) => {
   return await db.query.maintenanceRequests.findFirst({
     where: eq(maintenanceRequests.id, requestId),
     with: {
-      student: { columns: { fullName: true, phone: true, email: true } },
+      student: { columns: { id: true, fullName: true, phone: true, email: true } },
       unit: {
-        with: { property: { columns: { name: true, location: true } } }
+        with: { 
+          property: { 
+            columns: { id: true, landlordId: true, name: true, location: true } 
+          } 
+        }
       }
     }
   });
@@ -112,15 +98,32 @@ export const getMyMaintenanceRequestsService = async (studentId: number) => {
 };
 
 /* ================================
-   CREATE REQUEST
+   CREATE REQUEST (Linked with Notification)
 ================================ */
 export const createMaintenanceRequestService = async (request: TMRequestInsert) => {
   const result = await db.insert(maintenanceRequests).values(request).returning();
-  return result[0];
+  const newRequest = result[0];
+
+  // Fetch details to notify the landlord
+  const details = await getMaintenanceRequestByIdService(newRequest.id);
+
+if (details && details.unit?.property) {
+  await createNotificationService({
+    userId: details.unit.property.landlordId,
+    title: "New Maintenance Issue 🔧",
+    // Providing context in the message helps the landlord prioritize
+    message: `${details.student.fullName} reported: "${details.description.substring(0, 40)}..."`,
+    type: "maintenance",
+    // SYNCED WITH FRONTEND: Points to the Landlord's maintenance route
+    link: "/landlord/maintenance" 
+  });
+}
+
+  return newRequest;
 };
 
 /* ================================
-   UPDATE STATUS
+   UPDATE STATUS (Linked with Notification)
 ================================ */
 export const updateMaintenanceStatusService = async (requestId: number, status: string) => {
   const result = await db
@@ -130,6 +133,20 @@ export const updateMaintenanceStatusService = async (requestId: number, status: 
     .returning();
 
   if (!result.length) throw new Error("Maintenance request not found");
+
+  // Fetch details to notify the student
+  const details = await getMaintenanceRequestByIdService(requestId);
+  
+  if (details) {
+    await createNotificationService({
+      userId: details.studentId,
+      title: "Work Order Update 🛠️",
+      message: `Status updated to ${status.toUpperCase()} for ${details.unit.property.name}.`,
+      type: "maintenance",
+      link: "/dashboard/my-maintenance"
+    });
+  }
+
   return "Request status updated successfully";
 };
 

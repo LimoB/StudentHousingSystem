@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { Link, useNavigate } from "react-router-dom";
 import { logout } from "../app/slices/authSlice";
 import { markNotificationAsRead } from "../app/slices/notificationSlice";
-import { FaBell, FaSignOutAlt, FaUser, FaChevronDown, FaCog } from "react-icons/fa";
+import { FaBell, FaSignOutAlt, FaUser, FaChevronDown, FaCog, FaCreditCard, FaTools, FaInfoCircle } from "react-icons/fa";
 import type { RootState, AppDispatch } from "../app/store";
 
 const Navbar: React.FC = () => {
@@ -11,8 +11,8 @@ const Navbar: React.FC = () => {
   const navigate = useNavigate();
   
   const { user } = useSelector((state: RootState) => state.auth);
-  // Optional chaining in case notification slice isn't loaded
-  const { notifications } = useSelector((state: RootState) => state.notifications || { notifications: [] });
+  // Matches the 'isRead' property from our updated slice
+  const { notifications } = useSelector((state: RootState) => state.notifications);
   
   const [showNotif, setShowNotif] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -20,7 +20,8 @@ const Navbar: React.FC = () => {
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // Filter based on 'isRead' from backend
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const handleLogout = () => {
     dispatch(logout());
@@ -33,7 +34,15 @@ const Navbar: React.FC = () => {
     navigate(`/${user?.role}/notifications`);
   };
 
-  // Combined Click Outside Handler
+  // Helper to show relevant icons in the dropdown
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'payment': return <FaCreditCard className="text-emerald-500" />;
+      case 'maintenance': return <FaTools className="text-amber-500" />;
+      default: return <FaInfoCircle className="text-blue-500" />;
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) setShowNotif(false);
@@ -45,7 +54,6 @@ const Navbar: React.FC = () => {
 
   return (
     <header className="bg-white/90 backdrop-blur-md sticky top-0 z-[100] border-b border-gray-100 px-4 md:px-8 py-3 flex justify-between items-center">
-      {/* Brand - Updated to handle role-based home redirect */}
       <Link to={`/${user?.role}/dashboard`} className="flex items-center gap-2 group">
         <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-black group-hover:rotate-12 transition-transform shadow-lg shadow-blue-200">
           H
@@ -56,7 +64,6 @@ const Navbar: React.FC = () => {
       </Link>
 
       <div className="flex items-center gap-3 md:gap-6">
-        
         {/* Notification Bell */}
         <div className="relative" ref={notifRef}>
           <button
@@ -74,7 +81,7 @@ const Navbar: React.FC = () => {
           </button>
 
           {showNotif && (
-            <div className="absolute right-0 mt-3 w-80 bg-white shadow-2xl rounded-[2rem] overflow-hidden border border-gray-100 animate-in fade-in slide-in-from-top-5 duration-200">
+            <div className="absolute right-0 mt-3 w-80 bg-white shadow-2xl rounded-[1.5rem] overflow-hidden border border-gray-100 animate-in fade-in slide-in-from-top-5 duration-200">
               <div className="p-5 border-b border-gray-50 flex justify-between items-center">
                 <span className="font-black text-gray-900">Notifications</span>
                 {unreadCount > 0 && <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black">NEW</span>}
@@ -85,15 +92,25 @@ const Navbar: React.FC = () => {
                 ) : (
                   <ul className="divide-y divide-gray-50">
                     {notifications.slice(0, 5).map((n) => (
-                      <li key={n.id} onClick={() => handleNotificationClick(n.id, n.read)} className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors ${!n.read ? "bg-blue-50/40" : ""}`}>
-                        <p className={`text-sm ${!n.read ? "font-bold text-gray-900" : "text-gray-600"}`}>{n.title}</p>
-                        <p className="text-xs text-gray-400 mt-1 truncate">{n.message}</p>
+                      <li 
+                        key={n.id} 
+                        onClick={() => handleNotificationClick(n.id, n.isRead)} 
+                        className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors flex gap-3 items-start ${!n.isRead ? "bg-blue-50/40" : ""}`}
+                      >
+                        <div className="mt-1">{getIcon(n.type)}</div>
+                        <div className="flex-1">
+                          <p className={`text-sm leading-tight ${!n.isRead ? "font-bold text-gray-900" : "text-gray-600"}`}>{n.title}</p>
+                          <p className="text-[11px] text-gray-400 mt-1 line-clamp-2">{n.message}</p>
+                        </div>
+                        {!n.isRead && <div className="w-2 h-2 bg-blue-600 rounded-full mt-1.5" />}
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
-              <Link to={`/${user?.role}/notifications`} className="block p-4 text-center text-xs font-black text-blue-600 hover:bg-blue-50 uppercase tracking-widest">View All</Link>
+              <Link to={`/${user?.role}/notifications`} onClick={() => setShowNotif(false)} className="block p-4 text-center text-[10px] font-black text-blue-600 hover:bg-blue-50 uppercase tracking-widest border-t border-gray-50">
+                View All Notifications
+              </Link>
             </div>
           )}
         </div>
@@ -107,7 +124,7 @@ const Navbar: React.FC = () => {
               onClick={() => setShowProfile(!showProfile)}
               className="flex items-center gap-3 p-1 pr-3 rounded-2xl hover:bg-gray-50 transition-all"
             >
-              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700 font-black shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black shadow-lg shadow-blue-100">
                 {user.fullName.charAt(0).toUpperCase()}
               </div>
               <div className="hidden md:flex flex-col items-start">
@@ -118,24 +135,24 @@ const Navbar: React.FC = () => {
             </button>
 
             {showProfile && (
-              <div className="absolute right-0 mt-3 w-56 bg-white shadow-2xl rounded-[1.5rem] overflow-hidden border border-gray-100 py-2 animate-in fade-in slide-in-from-top-5 duration-200">
-                <div className="px-4 py-3 border-b border-gray-50 mb-2">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-tighter">Signed in as</p>
+              <div className="absolute right-0 mt-3 w-56 bg-white shadow-2xl rounded-[1.25rem] overflow-hidden border border-gray-100 py-2 animate-in fade-in slide-in-from-top-5 duration-200">
+                <div className="px-5 py-3 border-b border-gray-50 mb-2">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">Signed in as</p>
                   <p className="text-sm font-black text-gray-900 truncate">{user.email}</p>
                 </div>
                 
-                <Link to={`/${user.role}/profile`} className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                <Link to={`/${user.role}/profile`} onClick={() => setShowProfile(false)} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                   <FaUser className="text-gray-400" /> My Profile
                 </Link>
-                <Link to={`/${user.role}/settings`} className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+                <Link to={`/${user.role}/settings`} onClick={() => setShowProfile(false)} className="flex items-center gap-3 px-5 py-3 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">
                   <FaCog className="text-gray-400" /> Settings
                 </Link>
                 
-                <div className="h-[1px] bg-gray-50 my-2" />
+                <div className="h-[1px] bg-gray-50 my-2 mx-5" />
                 
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-5 py-3 text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"
                 >
                   <FaSignOutAlt /> Sign Out
                 </button>
