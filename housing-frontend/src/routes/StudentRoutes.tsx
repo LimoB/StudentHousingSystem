@@ -29,7 +29,6 @@ import PaymentDetail from "../pages/student/payments/PaymentDetail";
 import Properties from "../pages/student/properties/Properties";
 import PropertyDetail from "../pages/student/properties/PropertyDetail";
 import BookProperty from "../pages/student/properties/BookProperty";
-import Units from "../pages/student/units/Units";
 
 const StudentRoutes = () => {
   return (
@@ -57,7 +56,7 @@ const StudentRoutes = () => {
       <Route path="properties" element={<Properties />} />
       <Route path="properties/:id" element={<PropertyDetail />} />
       <Route path="properties/:id/book" element={<BookProperty />} />
-      <Route path="properties/:id/units" element={<Units />} />
+      {/* <Route path="properties/:id/units" element={<Units />} /> */}
     </>
   );
 };
