@@ -6,13 +6,13 @@ import { RootState, AppDispatch } from "../../app/store";
 import UnitCard from "../UnitCard";
 import { 
   HiOutlineSquaresPlus, 
-  HiOutlineHomeModern, 
   HiOutlineBuildingOffice2,
   HiOutlineExclamationTriangle,
-  HiOutlineArrowPath,
-  HiOutlineShieldCheck
+  HiOutlineShieldCheck,
+  HiOutlinePhoto,
+  HiOutlineArrowPath
 } from "react-icons/hi2";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const Units: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -23,7 +23,6 @@ const Units: React.FC = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   
   const [selectedPropertyId, setSelectedPropertyId] = useState<number | "all">("all");
-
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
@@ -35,110 +34,121 @@ const Units: React.FC = () => {
     };
   }, [dispatch]);
 
-  // 1. ROLE-BASED FILTERING
-  const visibleProperties = useMemo(() => {
-    if (!user || !properties) return [];
-    if (isAdmin) return properties;
-    
-    const currentUserId = (user as any).id || (user as any).userId;
-    return properties.filter(p => p.landlordId == currentUserId);
-  }, [properties, user, isAdmin]);
-
-  // 2. DATA MAPPING
-  const propertiesWithUnits = useMemo(() => {
-    return visibleProperties.map(property => ({
-      ...property,
-      currentUnits: units.filter((u) => u.propertyId === property.id)
-    }));
-  }, [visibleProperties, units]);
-
-  // 3. FILTERED DISPLAY LOGIC
-  const filteredDisplay = useMemo(() => {
-    return selectedPropertyId === "all" 
-      ? propertiesWithUnits 
-      : propertiesWithUnits.filter(p => p.id === selectedPropertyId);
-  }, [selectedPropertyId, propertiesWithUnits]);
-
-  const loading = propLoading || unitLoading;
-  const error = propError || unitError;
-
   const handleRefresh = () => {
     dispatch(fetchProperties());
     dispatch(fetchUnits());
   };
 
+  // 1. Filter properties based on user ownership
+  const visibleProperties = useMemo(() => {
+    if (!user || !properties) return [];
+    if (isAdmin) return properties;
+    const currentUserId = user.id || (user as any).userId;
+    return properties.filter(p => Number(p.landlordId) === Number(currentUserId));
+  }, [properties, user, isAdmin]);
+
+  // 2. Map units to their parent properties
+  const propertiesWithUnits = useMemo(() => {
+    return visibleProperties.map(property => ({
+      ...property,
+      currentUnits: units.filter((u) => {
+          const uPid = u.propertyId || (u as any).property_id;
+          return Number(uPid) === Number(property.id);
+      })
+    }));
+  }, [visibleProperties, units]);
+
+  // 3. Filter the grouped data based on the tab selected
+  const filteredDisplay = useMemo(() => {
+    return selectedPropertyId === "all" 
+      ? propertiesWithUnits 
+      : propertiesWithUnits.filter(p => p.id === Number(selectedPropertyId));
+  }, [selectedPropertyId, propertiesWithUnits]);
+
+  const loading = propLoading || unitLoading;
+  const error = propError || unitError;
+
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto min-h-screen bg-[#F8FAFC]">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
         <div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight uppercase">
             {isAdmin ? "Global Inventory" : "Unit Ledger"}
           </h1>
-          <p className="text-gray-400 font-bold mt-1 uppercase text-[10px] tracking-[0.1em]">
-            Monitoring <span className="text-blue-600">{units.length}</span> units across <span className="text-blue-600">{visibleProperties.length}</span> active assets.
-          </p>
+          <div className="flex items-center gap-4 mt-2">
+            <p className="text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em]">
+              Tracking <span className="text-blue-600 font-black">{units.length}</span> units across <span className="text-blue-600 font-black">{visibleProperties.length}</span> assets.
+            </p>
+            {/* Using handleRefresh here to solve linting error */}
+            <button 
+              onClick={handleRefresh}
+              className="p-2 bg-white rounded-full border border-gray-100 hover:border-blue-200 transition-all shadow-sm group"
+              title="Refresh Data"
+            >
+              <HiOutlineArrowPath className={`w-3.5 h-3.5 text-gray-400 group-hover:text-blue-600 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
         
-        {/* ACTION BUTTON: Only show Add Unit if NOT admin */}
         {!isAdmin ? (
           <button 
-            onClick={() => navigate("/landlord/units/add", { state: { propertyId: selectedPropertyId !== "all" ? selectedPropertyId : undefined } })}
-            className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-8 py-4 rounded-[1.25rem] font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition shadow-xl shadow-blue-100 active:scale-95"
+            onClick={() => navigate("/landlord/units/add", { 
+                state: { propertyId: selectedPropertyId !== "all" ? selectedPropertyId : undefined } 
+            })}
+            className="flex items-center justify-center space-x-3 bg-gray-900 text-white px-8 py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.2em] hover:bg-blue-600 transition-all shadow-2xl active:scale-95"
           >
-            <HiOutlineSquaresPlus className="w-5 h-5 stroke-[3]" />
+            <HiOutlineSquaresPlus className="w-5 h-5" />
             <span>Add New Unit</span>
           </button>
         ) : (
-          <div className="flex items-center gap-2 bg-white border border-gray-100 px-6 py-4 rounded-[1.25rem] text-gray-400 font-black text-[10px] uppercase tracking-widest shadow-sm">
-            <HiOutlineShieldCheck className="w-5 h-5 text-purple-500" />
-            <span>Read-Only Access</span>
+          <div className="flex items-center gap-3 bg-white border border-purple-100 px-6 py-4 rounded-2xl text-purple-600 font-black text-[10px] uppercase tracking-widest shadow-sm">
+            <HiOutlineShieldCheck className="w-5 h-5" />
+            <span>System Administrator Mode</span>
           </div>
         )}
       </div>
 
-      {/* Sync Error Display */}
+      {/* Error Alert - Using the 'error' variable here to solve linting error */}
       {error && (
-        <div className="mb-8 bg-red-50 border border-red-100 p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="bg-white p-3 rounded-xl border border-red-100 shadow-sm">
-              <HiOutlineExclamationTriangle className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-red-900 font-black text-[10px] uppercase tracking-widest">Sync Warning</p>
-              <p className="text-red-600 text-sm font-bold">{error}</p>
-            </div>
+        <div className="mb-10 bg-rose-50 border border-rose-100 p-6 rounded-[2rem] flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
+          <div className="p-3 bg-white rounded-xl shadow-sm">
+            <HiOutlineExclamationTriangle className="w-6 h-6 text-rose-500" />
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Database Sync Error</p>
+            <p className="text-sm font-bold text-rose-700">{error}</p>
           </div>
           <button 
             onClick={handleRefresh}
-            className="flex items-center gap-2 bg-white border border-red-200 text-red-600 px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-all active:scale-95"
+            className="px-6 py-3 bg-rose-500 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-rose-600 transition-all"
           >
-            <HiOutlineArrowPath className="w-4 h-4" /> Retry Sync
+            Retry Connection
           </button>
         </div>
       )}
 
-      {/* Property Filter Tabs */}
+      {/* Asset Switcher (Tabs) */}
       {visibleProperties.length > 0 && (
-        <div className="flex flex-wrap gap-3 mb-12 overflow-x-auto pb-4 no-scrollbar">
+        <div className="flex flex-wrap gap-2 mb-16 overflow-x-auto pb-4 no-scrollbar">
           <button
             onClick={() => setSelectedPropertyId("all")}
-            className={`px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap border ${
+            className={`px-7 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${
               selectedPropertyId === "all" 
-                ? "bg-gray-900 text-white border-gray-900 shadow-lg" 
-                : "bg-white text-gray-400 border-gray-100 shadow-sm hover:border-blue-200 hover:text-gray-600"
+                ? "bg-blue-600 text-white shadow-xl" 
+                : "bg-white text-gray-400 border border-gray-100 shadow-sm"
             }`}
           >
-            All Assets
+            Full Portfolio
           </button>
           {visibleProperties.map((prop) => (
             <button
               key={prop.id}
               onClick={() => setSelectedPropertyId(prop.id)}
-              className={`px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap border ${
+              className={`px-7 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border ${
                 selectedPropertyId === prop.id 
-                  ? (isAdmin ? "bg-purple-600 border-purple-600" : "bg-blue-600 border-blue-600") + " text-white shadow-lg" 
-                  : "bg-white text-gray-400 border-gray-100 shadow-sm hover:border-blue-200 hover:text-gray-600"
+                  ? "bg-gray-900 text-white shadow-xl" 
+                  : "bg-white text-gray-400 border-gray-100 shadow-sm"
               }`}
             >
               {prop.name}
@@ -147,68 +157,66 @@ const Units: React.FC = () => {
         </div>
       )}
 
-      {/* Main Content Areas */}
+      {/* Main Grid Content */}
       {loading && units.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32">
-           <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-blue-600 mb-6"></div>
-           <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest animate-pulse">Synchronizing Ledger...</p>
-        </div>
-      ) : visibleProperties.length === 0 && !loading ? (
-        <div className="bg-white rounded-[3rem] py-24 text-center border border-gray-100 shadow-sm px-6">
-           <HiOutlineBuildingOffice2 className="w-16 h-16 text-gray-100 mx-auto mb-6" />
-           <h2 className="text-2xl font-black text-gray-900 uppercase">Registry Empty</h2>
-           <p className="text-gray-400 font-bold text-sm mb-8">No active properties found in the global registry.</p>
-           {!isAdmin && (
-             <Link to="/landlord/properties/add" className="inline-block bg-gray-900 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-blue-600 transition-all">
-                Register Property
-             </Link>
-           )}
+        <div className="flex flex-col items-center justify-center py-40">
+           <div className="h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6"></div>
+           <p className="text-gray-400 font-black text-[10px] uppercase tracking-[0.3em]">Querying Database...</p>
         </div>
       ) : (
-        <div className="space-y-32">
+        <div className="space-y-24">
           {filteredDisplay.map((property) => (
-            <section key={property.id} className="animate-in fade-in slide-in-from-bottom-6 duration-700">
-              <div className="flex items-center justify-between mb-10 border-b border-gray-100 pb-10">
+            <section key={property.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+              {/* Asset Header Card */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-8 bg-white p-6 rounded-[3rem] border border-gray-50 shadow-sm">
                 <div className="flex items-center space-x-6">
-                  <div className={`p-5 rounded-[1.5rem] shadow-sm border ${isAdmin ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-white text-blue-600 border-gray-100'}`}>
-                    <HiOutlineHomeModern className="w-8 h-8" />
+                  <div className="relative w-24 h-24 md:w-28 md:h-28 shrink-0 rounded-[2rem] overflow-hidden border-4 border-gray-50 shadow-md">
+                    {property.imageUrl ? (
+                      <img src={property.imageUrl} alt={property.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gray-50 flex items-center justify-center text-gray-200">
+                        <HiOutlinePhoto size={32} />
+                      </div>
+                    )}
                   </div>
                   <div>
-                    <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase leading-none">{property.name}</h2>
-                    <div className="flex items-center gap-3 mt-2">
-                        <span className="flex items-center text-gray-400 text-[10px] font-black uppercase tracking-widest">
-                            {property.location}
-                        </span>
-                        {isAdmin && (
-                            <span className="bg-purple-100 text-purple-600 text-[9px] px-2 py-0.5 rounded-lg font-black">SYSTEM ID: {property.id}</span>
-                        )}
-                    </div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase mb-1">{property.name}</h2>
+                    <span className="text-gray-400 text-[9px] font-black uppercase tracking-widest flex items-center bg-gray-50 px-3 py-1 rounded-full w-fit">
+                        <HiOutlineBuildingOffice2 className="mr-1.5 text-blue-500 w-3.5 h-3.5" />
+                        {property.location}
+                    </span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-gray-900 text-4xl font-black tabular-nums tracking-tighter">
-                    {property.currentUnits.length.toString().padStart(2, '0')}
-                  </span>
-                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.3em] mt-1">Units Registered</p>
+
+                <div className="flex items-center gap-10 px-8 py-4 bg-gray-50 rounded-[2rem]">
+                   <div className="text-center">
+                      <p className="text-2xl font-black text-gray-900">{property.currentUnits.length.toString().padStart(2, '0')}</p>
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Units</p>
+                   </div>
+                   <div className="h-8 w-px bg-gray-200" />
+                   <div className="text-center">
+                      <p className="text-2xl font-black text-emerald-500">{property.currentUnits.filter(u => u.isAvailable).length.toString().padStart(2, '0')}</p>
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Vacant</p>
+                   </div>
                 </div>
               </div>
 
+              {/* Units Grid */}
               {property.currentUnits.length > 0 ? (
-                <div className="grid gap-10 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                   {property.currentUnits.map((unit) => (
-                    /* PASS viewOnly prop to UnitCard */
                     <UnitCard key={unit.id} unit={unit} viewOnly={isAdmin} />
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-[2.5rem] py-20 text-center border-2 border-dashed border-gray-100">
-                  <p className="text-gray-400 font-bold text-sm mb-4 uppercase tracking-widest text-[10px]">Inventory Empty</p>
+                <div className="bg-white rounded-[3rem] py-16 text-center border-2 border-dashed border-gray-100">
+                  <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest mb-6">Inventory Empty</p>
                   {!isAdmin && (
                     <button 
                       onClick={() => navigate("/landlord/units/add", { state: { propertyId: property.id } })}
-                      className="text-blue-600 font-black text-[10px] uppercase tracking-widest hover:text-blue-800 transition-colors flex items-center justify-center gap-2 mx-auto"
+                      className="bg-gray-900 text-white px-8 py-3 rounded-xl font-black text-[9px] uppercase tracking-[0.2em] hover:bg-blue-600 transition-all active:scale-95 shadow-lg"
                     >
-                      <HiOutlineSquaresPlus className="w-4 h-4" /> Initialize Units
+                      Provision Unit
                     </button>
                   )}
                 </div>

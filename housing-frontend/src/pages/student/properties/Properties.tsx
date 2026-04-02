@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react"; // useMemo is now used below
+import { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
 import { fetchProperties } from "../../../app/slices/propertySlice";
@@ -6,11 +6,10 @@ import { fetchUnits } from "../../../app/slices/unitSlice";
 import type { RootState, AppDispatch } from "../../../app/store";
 import { 
   MapPin, 
-  Building2, 
   Loader2, 
-  Lock,
   ArrowRight,
-  Inbox
+  Inbox,
+  Image as ImageIcon
 } from "lucide-react";
 
 const Properties: React.FC = () => {
@@ -18,17 +17,16 @@ const Properties: React.FC = () => {
   
   const { properties, loading: propLoading } = useSelector((state: RootState) => state.properties);
   const { units, loading: unitsLoading } = useSelector((state: RootState) => state.units);
-  const userRole = useSelector((state: RootState) => state.auth.user?.role);
+  const userRole = useSelector((state: RootState) => state.auth.user?.role) || 'student';
 
   useEffect(() => {
     dispatch(fetchProperties());
     dispatch(fetchUnits());
   }, [dispatch]);
 
-  // FIX: Using useMemo to resolve the linting error and optimize performance
+  // Memoized processing to handle image availability and occupancy logic
   const processedProperties = useMemo(() => {
     return properties.map((property: any) => {
-      // Logic copied from PropertyCard
       const propertyUnits = property.units || units.filter((u: any) => {
         const uPid = u.propertyId || u.property_id || u.property?.id;
         return Number(uPid) === Number(property.id);
@@ -46,7 +44,9 @@ const Properties: React.FC = () => {
         unitCount,
         availableCount,
         isSoldOut,
-        hasUnits: unitCount > 0
+        hasUnits: unitCount > 0,
+        // Ensure we have a valid image reference
+        displayImage: property.imageUrl || null 
       };
     });
   }, [properties, units]);
@@ -55,7 +55,7 @@ const Properties: React.FC = () => {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen bg-[#FDFDFF]">
         <Loader2 className="animate-spin text-blue-500" size={40} />
-        <p className="mt-4 text-slate-400 font-medium">Refining listings...</p>
+        <p className="mt-4 text-slate-400 font-bold uppercase text-[10px] tracking-[0.2em]">Synchronizing Registry...</p>
       </div>
     );
   }
@@ -63,86 +63,106 @@ const Properties: React.FC = () => {
   return (
     <div className="p-6 md:p-12 bg-[#F8FAFC] min-h-screen font-sans">
       <div className="max-w-7xl mx-auto">
+        
+        {/* Header Section */}
         <header className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
           <div className="space-y-2">
-            <span className="text-blue-600 font-bold text-sm tracking-[0.2em] uppercase">Premium Residencies</span>
-            <h1 className="text-5xl font-extrabold text-slate-900 tracking-tight">
+            <span className="text-blue-600 font-black text-[10px] tracking-[0.3em] uppercase">Premium Residencies</span>
+            <h1 className="text-5xl font-black text-slate-900 tracking-tight">
               Curated <span className="text-slate-400 italic font-light">Living.</span>
             </h1>
           </div>
-          <div className="flex items-center gap-3 bg-white px-5 py-2.5 rounded-2xl border border-slate-100 shadow-sm text-slate-600 font-semibold text-sm">
-            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-            {properties.length} Estates Available
+          <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl border border-slate-100 shadow-sm text-slate-600 font-black text-[10px] uppercase tracking-widest">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+            {properties.length} Estates Verified
           </div>
         </header>
 
         {properties.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-[3rem] border border-slate-100">
-            <Inbox className="mx-auto text-slate-200 mb-4" size={48} />
-            <p className="text-slate-400 font-medium">No properties available at the moment.</p>
+          <div className="text-center py-32 bg-white rounded-[4rem] border border-slate-100 shadow-sm">
+            <Inbox className="mx-auto text-slate-100 mb-6" size={64} />
+            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Registry Empty</h3>
+            <p className="text-slate-400 font-medium mt-2">Check back later for new student listings.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
             {processedProperties.map((property: any) => (
               <div
                 key={property.id}
-                className={`group relative bg-white rounded-[2.5rem] p-2 transition-all duration-500 shadow-sm hover:shadow-xl ${
-                  property.isSoldOut ? "opacity-90" : ""
+                className={`group relative bg-white rounded-[3rem] border border-slate-100 overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-blue-100/50 flex flex-col ${
+                  property.isSoldOut ? "grayscale-[0.5]" : ""
                 }`}
               >
-                <div className="absolute top-6 right-6 z-10">
-                  <span className={`px-4 py-1.5 rounded-full text-[10px] font-bold tracking-widest uppercase border ${
-                    property.isSoldOut 
-                    ? "bg-slate-100 text-slate-500 border-slate-200" 
-                    : "bg-emerald-50 text-emerald-600 border-emerald-100"
-                  }`}>
-                    {property.isSoldOut ? "Fully Leased" : "Active Listing"}
-                  </span>
-                </div>
-
-                <div className="p-8 flex flex-col h-full min-h-[400px]">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-8 transition-all ${
-                    property.isSoldOut ? "bg-slate-50 text-slate-300" : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"
-                  }`}>
-                    {property.isSoldOut ? <Lock size={22} /> : <Building2 size={22} />}
+                {/* Image Header with Cloudinary Support */}
+                <div className="h-64 relative overflow-hidden bg-slate-100">
+                  {property.displayImage ? (
+                    <img 
+                      src={property.displayImage} 
+                      alt={property.name} 
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-slate-800 to-blue-900 flex items-center justify-center">
+                      <ImageIcon className="text-white/10" size={48} />
+                    </div>
+                  )}
+                  
+                  {/* Status Badge Over Image */}
+                  <div className="absolute top-6 right-6">
+                    <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black tracking-widest uppercase border backdrop-blur-md ${
+                      property.isSoldOut 
+                      ? "bg-white/20 text-white border-white/20" 
+                      : "bg-emerald-500 text-white border-transparent shadow-lg shadow-emerald-500/20"
+                    }`}>
+                      {property.isSoldOut ? "Fully Leased" : "Vacancies Open"}
+                    </span>
                   </div>
                   
-                  <div className="space-y-3">
-                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight">{property.name}</h2>
-                    <div className="flex items-center text-slate-400 font-medium text-sm">
-                      <MapPin size={14} className="mr-1.5 text-blue-400" />
-                      {property.location}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-40 group-hover:opacity-60 transition-opacity" />
+                </div>
+
+                {/* Content Area */}
+                <div className="p-8 flex flex-col flex-grow">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="space-y-1">
+                      <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-tight group-hover:text-blue-600 transition-colors uppercase">
+                        {property.name}
+                      </h2>
+                      <div className="flex items-center text-slate-400 font-black text-[10px] uppercase tracking-widest">
+                        <MapPin size={12} className="mr-1 text-blue-500" />
+                        {property.location}
+                      </div>
                     </div>
                   </div>
 
-                  <p className="mt-6 text-slate-500 text-sm leading-relaxed line-clamp-3">
-                    {property.description || "Premium student accommodation."}
+                  <p className="text-slate-500 text-sm font-medium leading-relaxed line-clamp-2 mb-8">
+                    {property.description || "Sophisticated student living spaces designed for academic excellence."}
                   </p>
 
-                  <div className="mt-auto pt-8 flex items-center justify-between border-t border-slate-50">
+                  <div className="mt-auto pt-8 border-t border-slate-50 flex items-center justify-between">
                     <div className="space-y-1">
-                      <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Availability</p>
-                      <div className={`text-base font-bold ${property.isSoldOut ? 'text-slate-400' : 'text-slate-900'}`}>
+                      <p className="text-[9px] text-slate-300 uppercase font-black tracking-widest">Availability</p>
+                      <div className={`text-sm font-black uppercase tracking-tight ${property.isSoldOut ? 'text-slate-400' : 'text-slate-900'}`}>
                         {unitsLoading && units.length === 0 && !property.units ? (
-                           <span className="text-slate-300 italic animate-pulse text-xs">Checking...</span>
+                           <span className="text-slate-200 animate-pulse">Scanning...</span>
                         ) : property.hasUnits ? (
-                           property.isSoldOut ? "Waitlist Only" : `${property.availableCount} Units Available`
+                           property.isSoldOut ? "Waitlist Only" : `${property.availableCount} Units Left`
                         ) : (
-                           <span className="text-slate-400 font-medium text-sm">No Units Listed</span>
+                           "Registration Pending"
                         )}
                       </div>
                     </div>
                     
                     <Link
                       to={`/${userRole}/properties/${property.id}`}
-                      className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-bold transition-all ${
+                      className={`flex items-center gap-2 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 ${
                         property.isSoldOut 
-                        ? "bg-slate-50 text-slate-400" 
-                        : "bg-slate-900 text-white hover:bg-blue-600 shadow-sm"
+                        ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
+                        : "bg-slate-900 text-white hover:bg-blue-600 shadow-xl shadow-slate-100 hover:shadow-blue-200"
                       }`}
                     >
-                      {property.isSoldOut ? "Details" : "Explore"}
-                      <ArrowRight size={14} />
+                      {property.isSoldOut ? "Sold Out" : "Explore"}
+                      <ArrowRight size={14} strokeWidth={3} />
                     </Link>
                   </div>
                 </div>

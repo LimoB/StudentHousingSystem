@@ -12,6 +12,9 @@ import {
   adminOrLandlord,
 } from "../middleware/authMiddleware";
 
+// IMPORT THE UPLOAD MIDDLEWARE
+import { upload } from "../middleware/cloudinary"; 
+
 export const propertyRouter = Router();
 
 /* ================================
@@ -26,17 +29,26 @@ propertyRouter.get("/:id", authMiddleware, getPropertyById);
    LANDLORD / ADMIN
 ================================ */
 
+/**
+ * CREATE PROPERTY
+ * upload.single("image") handles the multipart/form-data
+ */
 propertyRouter.post(
   "/",
   authMiddleware,
   adminOrLandlord,
+  upload.single("image"), // Added Middleware
   createProperty
 );
 
+/**
+ * UPDATE PROPERTY
+ */
 propertyRouter.put(
   "/:id",
   authMiddleware,
   adminOrLandlord,
+  upload.single("image"), // Added Middleware
   updateProperty
 );
 

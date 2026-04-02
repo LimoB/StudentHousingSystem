@@ -79,62 +79,85 @@ export const getUnitsByPropertyService = async (propertyId: number, landlordId?:
 /* ================================
    CREATE UNIT (Notification Added)
 ================================ */
+/* ================================
+   CREATE UNIT (Optimized)
+================================ */
 export const createUnitService = async (unit: TUnitInsert) => {
+  // 1. Verify Property Exists first to avoid Foreign Key Crash
+  const property = await db.query.properties.findFirst({
+    where: eq(properties.id, unit.propertyId as number)
+  });
+
+  if (!property) {
+    throw new Error(`Property with ID ${unit.propertyId} not found in registry.`);
+  }
+
+  // 2. Perform Insert
   const result = await db.insert(units).values(unit).returning();
   const newUnit = result[0];
 
-  // Fetch property details to get the landlordId
-  const property = await db.query.properties.findFirst({
-    where: eq(properties.id, newUnit.propertyId)
-  });
-
-  if (property) {
+  // 3. Trigger Notification
+  try {
     await createNotificationService({
       userId: property.landlordId,
       title: "New Unit Added 🚪",
       message: `Unit ${newUnit.unitNumber} has been added to ${property.name}.`,
       type: "info",
-      // UPDATED LINK
       link: `/landlord/units`
     });
+  } catch (notifErr) {
+    console.warn("Notification failed, but unit was created:", notifErr);
   }
 
   return newUnit;
 };
 
 /* ================================
-   UPDATE UNIT (Notification Added)
+   UPDATE UNIT (Fixed to return Object)
 ================================ */
 export const updateUnitService = async (
   unitId: number,
   updates: Partial<TUnitInsert>
 ) => {
+  // 1. Execute Update with RETURNING to get the fresh data
   const result = await db
     .update(units)
     .set(updates)
     .where(eq(units.id, unitId))
     .returning();
 
-  if (!result.length) throw new Error("Unit not found");
+  if (!result || !result.length) {
+    throw new Error("Unit not found or no changes made");
+  }
+
   const updatedUnit = result[0];
 
-  // Fetch property context for the notification
+  // 2. Fetch property context for the notification
   const property = await db.query.properties.findFirst({
     where: eq(properties.id, updatedUnit.propertyId)
   });
 
+  // 3. Trigger Notification (Async - we don't necessarily need to wait for this to return data)
   if (property) {
-    await createNotificationService({
-      userId: property.landlordId,
-      title: "Unit Updated 📝",
-      message: `Unit ${updatedUnit.unitNumber} in ${property.name} has been updated.`,
-      type: "info",
-      // UPDATED LINK
-      link: `/landlord/units`
-    });
+    try {
+      await createNotificationService({
+        userId: property.landlordId, // Consistently using landlordId
+        title: "Unit Updated 📝",
+        message: `Unit ${updatedUnit.unitNumber} in ${property.name} has been updated.`,
+        type: "info",
+        link: `/landlord/units`
+      });
+    } catch (notiError) {
+      console.error("[Service Warning] Notification failed to send:", notiError);
+      // We don't throw here because the DB update actually succeeded
+    }
   }
 
-  return "Unit updated successfully";
+  /**
+   * FIX: Return the actual OBJECT, not a string message.
+   * This allows the Controller to send JSON back to the Frontend.
+   */
+  return updatedUnit; 
 };
 
 /* ================================

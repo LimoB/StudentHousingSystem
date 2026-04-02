@@ -13,6 +13,9 @@ import {
   adminOrLandlord,
 } from "../middleware/authMiddleware";
 
+// IMPORT THE UPLOAD MIDDLEWARE
+import { upload } from "../middleware/cloudinary"; 
+
 export const unitRouter = Router();
 
 /* ================================
@@ -33,17 +36,26 @@ unitRouter.get(
    MANAGE UNITS
 ================================ */
 
+/**
+ * CREATE UNIT
+ * upload.single("image") looks for a field named 'image' in your FormData
+ */
 unitRouter.post(
   "/",
   authMiddleware,
   adminOrLandlord,
+  upload.single("image"), // Added Middleware
   createUnit
 );
 
+/**
+ * UPDATE UNIT
+ */
 unitRouter.put(
   "/:id",
   authMiddleware,
   adminOrLandlord,
+  upload.single("image"), // Added Middleware
   updateUnit
 );
 

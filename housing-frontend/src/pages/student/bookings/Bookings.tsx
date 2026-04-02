@@ -15,7 +15,6 @@ import {
   CreditCard, 
   ChevronRight, 
   Loader2, 
-  AlertCircle,
   ShieldCheck,
   Building2,
   Clock
@@ -25,6 +24,7 @@ const Bookings: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { bookings, loading, error } = useSelector((state: RootState) => state.bookings);
   const user = useSelector((state: RootState) => state.auth.user);
 

@@ -10,13 +10,13 @@ import {
   HiOutlineBuildingOffice2,
   HiOutlineMagnifyingGlass
 } from "react-icons/hi2";
+import { Property } from "../../api/properties";
 
 const Properties: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { properties, loading, error } = useSelector((state: RootState) => state.properties);
+  const { properties, loading } = useSelector((state: RootState) => state.properties);
   const user = useSelector((state: RootState) => state.auth.user);
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -27,34 +27,33 @@ const Properties: React.FC = () => {
 
   const isAdmin = user?.role === 'admin';
 
-  // 1. GROUPING LOGIC
+  // 1. REFINED GROUPING LOGIC
   const groupedProperties = useMemo(() => {
     if (!properties || properties.length === 0) return {};
     
-    // We cast properties to any[] here to avoid the WritableNonArrayDraft error 
-    // regarding the nested 'landlord' object.
-    let filtered = [...(properties as any[])];
+    // Create a local copy for filtering
+    let filtered = [...properties];
 
-    // Apply basic search filter
+    // Search Filter: Name or Location
     if (searchTerm) {
+      const lowSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(p => 
-        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        p.location?.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name?.toLowerCase().includes(lowSearch) || 
+        p.location?.toLowerCase().includes(lowSearch)
       );
     }
 
-    // If Landlord: Filter to only their own
+    // Landlord Logic: Standardized to use property.landlordId
     if (!isAdmin) {
-      const currentUserId = (user as any).id || (user as any).userId;
-      return {
-        "My Portfolio": filtered.filter(p => p.landlordId == currentUserId)
-      };
+      const currentUserId = user?.userId;
+      const myAssets = filtered.filter(p => p.landlordId === currentUserId);
+      return myAssets.length > 0 ? { "My Portfolio": myAssets } : {};
     }
 
-    // If Admin: Group by Landlord Name
-    return filtered.reduce((acc: Record<string, any[]>, prop) => {
-      // Check both nested object or a flat property name as fallback
-      const landlordName = prop.landlord?.fullName || prop.landlordName || "Independent Owners";
+    // Admin Logic: Group by Landlord Name
+    return filtered.reduce((acc: Record<string, Property[]>, prop) => {
+      // Use the nested landlord object if available, otherwise fallback
+      const landlordName = (prop as any).landlord?.fullName || (prop as any).landlordName || "Independent Owners";
       if (!acc[landlordName]) acc[landlordName] = [];
       acc[landlordName].push(prop);
       return acc;
@@ -75,7 +74,7 @@ const Properties: React.FC = () => {
             </span>
           </div>
           <h1 className="text-4xl font-black text-gray-900 tracking-tight">
-            {isAdmin ? "Global Portfolio" : `Welcome, ${user?.fullName?.split(' ')[0]}`}
+            {isAdmin ? "Global Portfolio" : `Welcome, ${user?.fullName?.split(' ')[0] || 'User'}`}
           </h1>
           <p className="text-gray-400 font-bold text-[10px] mt-1 uppercase tracking-widest">
             Monitoring <span className="text-blue-600 font-black">{properties.length}</span> Active Managed Assets.
@@ -87,7 +86,7 @@ const Properties: React.FC = () => {
             <HiOutlineMagnifyingGlass className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 w-5 h-5 group-focus-within:text-blue-600 transition-colors" />
             <input 
               type="text"
-              placeholder="Filter by name..."
+              placeholder="Search properties..."
               className="bg-white border border-gray-100 pl-12 pr-6 py-4 rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-blue-50 w-64 transition-all placeholder:text-gray-300"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -114,39 +113,35 @@ const Properties: React.FC = () => {
         <div className="bg-white rounded-[3rem] py-24 px-6 border border-gray-100 text-center shadow-sm">
           <HiOutlineBuildingOffice2 className="w-16 h-16 text-gray-100 mx-auto mb-6" />
           <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Portfolio Empty</h2>
-          <p className="text-gray-400 mt-2 font-bold text-sm mb-8">No properties found matching your current credentials.</p>
+          <p className="text-gray-400 mt-2 font-bold text-sm mb-8">No properties found matching your search.</p>
           <button onClick={() => setSearchTerm("")} className="text-blue-600 font-black text-[10px] uppercase tracking-widest hover:underline">Reset Search</button>
         </div>
       ) : (
-        <div className="space-y-32">
-          {Object.entries(groupedProperties).map(([landlordName, props]: [string, any]) => (
+        <div className="space-y-24">
+          {Object.entries(groupedProperties).map(([landlordName, props]) => (
             <div key={landlordName} className="animate-in fade-in slide-in-from-bottom-4 duration-700">
               
-              {/* Group Header - Sticky to keep context while scrolling many properties */}
-              <div className="sticky top-4 z-20 flex items-center justify-between mb-10 bg-white/80 backdrop-blur-md p-6 rounded-[2rem] border border-gray-50 shadow-sm">
-                <div className="flex items-center gap-5">
-                  <div className="p-4 bg-gray-900 rounded-2xl text-white shadow-lg">
-                     <HiOutlineUserGroup className="w-6 h-6" />
+              {/* Group Header */}
+              <div className="sticky top-4 z-20 flex items-center justify-between mb-8 bg-white/80 backdrop-blur-md p-5 rounded-[2rem] border border-gray-50 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-gray-900 rounded-xl text-white shadow-lg">
+                     <HiOutlineUserGroup className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">{landlordName}</h3>
-                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em]">Verified Landlord • {props.length} Assets</p>
+                    <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">{landlordName}</h3>
+                    <p className="text-[9px] font-black text-blue-600 uppercase tracking-[0.2em]">Verified Provider • {props.length} Assets</p>
                   </div>
                 </div>
-                
-                {isAdmin && (
-                  <div className="hidden md:block">
-                    <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest border border-gray-100 px-3 py-1 rounded-lg">View Only Mode</span>
-                  </div>
-                )}
               </div>
 
               {/* Property Grid */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
-                {props.map((property: any) => (
-                  <div key={property.id}>
-                     <PropertyCard property={property} viewOnly={isAdmin} />
-                  </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {props.map((property) => (
+                  <PropertyCard 
+                    key={property.id} 
+                    property={property} 
+                    viewOnly={isAdmin} 
+                  />
                 ))}
               </div>
             </div>

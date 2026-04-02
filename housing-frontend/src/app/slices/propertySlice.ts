@@ -9,7 +9,7 @@ import {
   CreatePropertyPayload,
 } from "../../api/properties";
 import { createUnitAction, deleteUnitAction, updateUnitAction } from "./unitSlice";
-import { RootState } from "../../app/store"; // Added to access Auth state
+import { RootState } from "../../app/store";
 
 interface PropertyState {
   properties: Property[];
@@ -29,20 +29,14 @@ const initialState: PropertyState = {
    THUNKS
 ========================= */
 
-// UPDATED: Added { state: RootState } to access the user role
+/**
+ * FETCH ALL PROPERTIES
+ */
 export const fetchProperties = createAsyncThunk<Property[], void, { rejectValue: string; state: RootState }>(
   "properties/fetchAll",
   async (_, thunkAPI) => {
     try {
-      const state = thunkAPI.getState();
-      const user = state.auth.user;
-
-      // LOGIC: If Admin, your backend usually needs a specific flag or different route
-      // If your backend handles this automatically via the token, getProperties() is fine.
-      // If you have an admin-specific route, call it here based on user.role.
       const response = await getProperties();
-      
-      console.log(`📡 Property Sync (${user?.role}):`, response.length, "items found.");
       return response;
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to fetch properties");
@@ -50,6 +44,9 @@ export const fetchProperties = createAsyncThunk<Property[], void, { rejectValue:
   }
 );
 
+/**
+ * FETCH SINGLE PROPERTY
+ */
 export const fetchPropertyById = createAsyncThunk<Property, number, { rejectValue: string }>(
   "properties/fetchById",
   async (id, thunkAPI) => {
@@ -61,18 +58,26 @@ export const fetchPropertyById = createAsyncThunk<Property, number, { rejectValu
   }
 );
 
+/**
+ * CREATE PROPERTY
+ */
 export const createPropertyAction = createAsyncThunk<Property, CreatePropertyPayload, { rejectValue: string }>(
   "properties/create",
   async (payload, thunkAPI) => {
     try {
       const response = await createProperty(payload);
-      return response.property; 
+      // Fixed: Fallback to response if response.property is undefined (flat response)
+      return (response as any).property || response; 
     } catch (error: any) {
       return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to create property");
     }
   }
 );
 
+/**
+ * UPDATE PROPERTY
+ * This fix addresses the "reading id of undefined" error
+ */
 export const updatePropertyAction = createAsyncThunk<
   Property, 
   { id: number; data: Partial<CreatePropertyPayload> },
@@ -80,12 +85,28 @@ export const updatePropertyAction = createAsyncThunk<
 >("properties/update", async (payload, thunkAPI) => {
   try {
     const response = await updateProperty(payload.id, payload.data);
-    return response.property; 
+    
+    /**
+     * YOUR BACKEND LOG SHOWS: 
+     * Success Response: { id: 9, name: 'Neema Hostel', ... } 
+     * It does NOT have a .property wrapper. 
+     */
+    const updatedProperty = (response as any).property || response;
+
+    if (!updatedProperty || !updatedProperty.id) {
+        throw new Error("Server returned an invalid property format");
+    }
+
+    return updatedProperty; 
   } catch (error: any) {
-    return thunkAPI.rejectWithValue(error.response?.data?.message || "Failed to update property");
+    const message = error.response?.data?.message || error.message || "Failed to update property";
+    return thunkAPI.rejectWithValue(message);
   }
 });
 
+/**
+ * DELETE PROPERTY
+ */
 export const deletePropertyAction = createAsyncThunk<number, number, { rejectValue: string }>(
   "properties/delete",
   async (id, thunkAPI) => {
@@ -135,12 +156,20 @@ const propertySlice = createSlice({
         state.properties.unshift({ ...action.payload, units: [] });
       })
 
-      /* UPDATE */
+      /* UPDATE (CRITICAL FIX) */
       .addCase(updatePropertyAction.fulfilled, (state, action: PayloadAction<Property>) => {
         const updated = action.payload;
-        state.properties = state.properties.map((p) => p.id === updated.id ? updated : p);
+        
+        // Ensure state.properties exists
+        if (state.properties) {
+          state.properties = state.properties.map((p) => 
+            p.id === updated.id ? { ...p, ...updated } : p
+          );
+        }
+        
+        // Update selection if it matches
         if (state.selectedProperty?.id === updated.id) {
-          state.selectedProperty = updated;
+          state.selectedProperty = { ...state.selectedProperty, ...updated };
         }
       })
 
@@ -152,14 +181,17 @@ const propertySlice = createSlice({
         }
       })
 
-      /* CROSS-SLICE LISTENERS: UNITS */
+      /* --- UNIT LISTENERS --- */
       .addCase(createUnitAction.fulfilled, (state, action: any) => {
         const newUnit = action.payload.unit || action.payload;
         const targetId = newUnit.propertyId;
+        
         const propertyInList = state.properties.find(p => p.id === targetId);
         if (propertyInList) {
           propertyInList.units = propertyInList.units ? [...propertyInList.units, newUnit] : [newUnit];
+          if (propertyInList._count) propertyInList._count.units += 1;
         }
+
         if (state.selectedProperty && state.selectedProperty.id === targetId) {
           state.selectedProperty.units = state.selectedProperty.units 
             ? [...state.selectedProperty.units, newUnit] 
@@ -170,10 +202,12 @@ const propertySlice = createSlice({
       .addCase(updateUnitAction.fulfilled, (state, action: any) => {
         const updatedUnit = action.payload.unit || action.payload;
         const updateInArray = (units: any[]) => units.map(u => u.id === updatedUnit.id ? updatedUnit : u);
+        
         state.properties.forEach(p => {
           if (p.units) p.units = updateInArray(p.units);
         });
-        if (state.selectedProperty?.units) {
+        
+        if (state.selectedProperty?.id === updatedUnit.propertyId && state.selectedProperty.units) {
           state.selectedProperty.units = updateInArray(state.selectedProperty.units);
         }
       })
@@ -181,9 +215,15 @@ const propertySlice = createSlice({
       .addCase(deleteUnitAction.fulfilled, (state, action: any) => {
         const deletedId = action.payload;
         const filterArray = (units: any[]) => units.filter(u => u.id !== deletedId);
+        
         state.properties.forEach(p => {
-          if (p.units) p.units = filterArray(p.units);
+          if (p.units) {
+            const originalLength = p.units.length;
+            p.units = filterArray(p.units);
+            if (p._count && p.units.length < originalLength) p._count.units -= 1;
+          }
         });
+        
         if (state.selectedProperty?.units) {
           state.selectedProperty.units = filterArray(state.selectedProperty.units);
         }

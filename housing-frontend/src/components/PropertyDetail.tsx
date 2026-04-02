@@ -7,12 +7,13 @@ import {
   HiOutlineArrowLeft, 
   HiOutlineMapPin, 
   HiOutlinePlus, 
-  HiOutlineHome, 
   HiOutlineUsers,
   HiOutlineExclamationTriangle,
   HiOutlineCube,
   HiOutlinePencil,
-  HiOutlineShieldCheck
+  HiOutlineShieldCheck,
+  HiOutlinePhoto,
+  HiOutlineBanknotes
 } from "react-icons/hi2";
 
 const PropertyDetail: React.FC = () => {
@@ -34,7 +35,7 @@ const PropertyDetail: React.FC = () => {
 
   const stats = useMemo(() => {
     if (!selectedProperty || !selectedProperty.units) {
-      return { total: 0, occupied: 0, vacancy: 0 };
+      return { total: 0, occupied: 0, vacantCount: 0, vacancy: 0, potentialRevenue: 0 };
     }
 
     const units = selectedProperty.units;
@@ -42,8 +43,9 @@ const PropertyDetail: React.FC = () => {
     const occupied = units.filter(u => u.isAvailable === false).length;
     const vacantCount = total - occupied;
     const vacancyRate = total > 0 ? Math.round((vacantCount / total) * 100) : 0;
+    const potentialRevenue = units.reduce((acc, curr) => acc + Number(curr.price), 0);
 
-    return { total, occupied, vacancy: vacancyRate };
+    return { total, occupied, vacantCount, vacancy: vacancyRate, potentialRevenue };
   }, [selectedProperty]);
 
   if (loading) {
@@ -62,12 +64,12 @@ const PropertyDetail: React.FC = () => {
       <div className="p-10 text-center min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC]">
         <div className="bg-white p-12 rounded-[3rem] shadow-xl border border-gray-100 flex flex-col items-center">
             <HiOutlineExclamationTriangle className="w-16 h-16 text-rose-400 mb-6" />
-            <h2 className="text-2xl font-black text-gray-900 mb-2">Record Not Found</h2>
+            <h2 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tight">Record Not Found</h2>
             <button 
                 onClick={() => navigate(`${basePath}/properties`)} 
                 className="mt-6 bg-gray-900 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-2 hover:bg-blue-600 transition-colors uppercase text-[10px] tracking-widest"
             >
-                <HiOutlineArrowLeft /> Return to Portfolio
+                <HiOutlineArrowLeft className="stroke-[3]" /> Return to Portfolio
             </button>
         </div>
       </div>
@@ -117,43 +119,67 @@ const PropertyDetail: React.FC = () => {
         
         {/* Left Column: Property Identity */}
         <div className="lg:col-span-1 space-y-8">
-          <div className="bg-white rounded-[3rem] p-10 border border-gray-100 shadow-sm relative overflow-hidden">
-                <div className="absolute -right-4 -top-4 w-32 h-32 bg-blue-50 rounded-full opacity-50" />
-                <div className="w-16 h-16 bg-gray-900 rounded-[1.5rem] flex items-center justify-center text-white mb-8 shadow-xl relative z-10">
-                    <HiOutlineHome className="w-8 h-8" />
+          <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+                <div className="h-72 relative bg-gray-100 group">
+                    {selectedProperty.imageUrl ? (
+                        <img 
+                            src={selectedProperty.imageUrl} 
+                            alt={selectedProperty.name} 
+                            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-gray-800 to-slate-900 flex items-center justify-center">
+                            <HiOutlinePhoto className="text-white/10 w-20 h-20" />
+                        </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                    <div className="absolute bottom-8 left-8">
+                        <span className="bg-white/20 backdrop-blur-md text-white text-[9px] font-black px-4 py-1.5 rounded-lg uppercase tracking-[0.2em] border border-white/20">
+                            {selectedProperty.status || 'Verified Registry'}
+                        </span>
+                    </div>
                 </div>
-                <h1 className="text-4xl font-black text-gray-900 tracking-tight mb-3 leading-tight relative z-10 uppercase">
-                    {selectedProperty.name}
-                </h1>
-                <p className="flex items-center text-gray-400 font-bold text-xs mb-10 relative z-10 uppercase tracking-widest">
-                    <HiOutlineMapPin className="mr-2 text-blue-500 w-5 h-5" />
-                    {selectedProperty.location}
-                </p>
-                <div className="bg-gray-50 rounded-[2rem] p-8 border border-gray-100">
-                    <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mb-4">Official Description</p>
-                    <p className="text-gray-600 font-medium text-sm leading-relaxed">
-                        {selectedProperty.description || "System record for " + selectedProperty.name + "."}
+
+                <div className="p-10">
+                    <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-3 uppercase leading-none">
+                        {selectedProperty.name}
+                    </h1>
+                    <p className="flex items-center text-gray-400 font-bold text-[10px] mb-10 uppercase tracking-[0.2em]">
+                        <HiOutlineMapPin className="mr-2 text-blue-500 w-4 h-4" />
+                        {selectedProperty.location}
                     </p>
+                    
+                    <div className="bg-gray-50 rounded-[2.5rem] p-8 border border-gray-100">
+                        <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.3em] mb-4">Official Asset Description</p>
+                        <p className="text-gray-600 font-medium text-sm leading-relaxed italic">
+                            "{selectedProperty.description || "No descriptive notes available for this asset registry."}"
+                        </p>
+                    </div>
                 </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-6">
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center justify-between group">
+          {/* Performance Tiles */}
+          <div className="grid grid-cols-1 gap-6">
+            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Live Occupancy</p>
-                <p className="text-3xl font-black text-gray-900">{stats.occupied}<span className="text-gray-200 mx-1">/</span>{stats.total}</p>
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Portfolio Revenue</p>
+                <p className="text-2xl font-black text-gray-900">
+                    <span className="text-blue-600 text-sm mr-1">KES</span>
+                    {stats.potentialRevenue.toLocaleString()}
+                </p>
               </div>
-              <div className="p-4 bg-blue-50 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-all text-blue-500">
-                <HiOutlineUsers className="w-6 h-6" />
+              <div className="p-4 bg-blue-50 rounded-2xl text-blue-500">
+                <HiOutlineBanknotes className="w-6 h-6" />
               </div>
             </div>
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center justify-between group">
+
+            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Vacancy Rate</p>
-                <p className="text-3xl font-black text-gray-900">{stats.vacancy}%</p>
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Occupancy Load</p>
+                <p className="text-3xl font-black text-gray-900">{stats.occupied}<span className="text-gray-200 mx-1">/</span>{stats.total}</p>
               </div>
-              <div className="p-4 bg-emerald-50 rounded-2xl group-hover:bg-emerald-600 group-hover:text-white transition-all text-emerald-500">
-                <HiOutlineCube className="w-6 h-6" />
+              <div className="p-4 bg-emerald-50 rounded-2xl text-emerald-500">
+                <HiOutlineUsers className="w-6 h-6" />
               </div>
             </div>
           </div>
@@ -161,76 +187,83 @@ const PropertyDetail: React.FC = () => {
 
         {/* Right Column: Units Inventory Table */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full">
-            <div className="p-10 border-b border-gray-50 flex items-center justify-between bg-white">
-              <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase text-sm">Units Inventory</h2>
-              <span className="bg-gray-100 text-gray-400 text-[9px] font-black px-5 py-2.5 rounded-full uppercase tracking-[0.2em]">
-                {stats.total} Registered Units
+          <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
+            <div className="p-10 border-b border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight uppercase">Inventory Ledger</h2>
+                <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mt-1">Detailed Unit Breakdown</p>
+              </div>
+              <span className="bg-gray-900 text-white text-[9px] self-start font-black px-5 py-2.5 rounded-full uppercase tracking-[0.2em]">
+                {stats.total} Total Sub-Assets
               </span>
             </div>
 
-            <div className="p-8 overflow-x-auto">
+            <div className="p-8">
               {selectedProperty.units && selectedProperty.units.length > 0 ? (
-                <table className="w-full text-left border-separate border-spacing-y-4">
-                  <thead>
-                    <tr className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
-                      <th className="px-8 py-2">Unit Name</th>
-                      <th className="px-8 py-2 text-center">Monthly Price</th>
-                      <th className="px-8 py-2 text-center">Status</th>
-                      <th className="px-8 py-2 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedProperty.units.map((unit: any) => (
-                        <tr key={unit.id} className="group transition-all">
-                          <td className="px-8 py-6 bg-white rounded-l-[2rem] border-y border-l border-gray-50 group-hover:border-blue-100 transition-colors shadow-sm">
-                            <div className="font-black text-gray-900 text-lg uppercase tracking-tight">{unit.unitNumber}</div>
-                            <div className="text-[9px] text-gray-400 font-black uppercase tracking-widest mt-1">{unit.type || "Standard Unit"}</div>
-                          </td>
-
-                          <td className="px-8 py-6 bg-white border-y border-gray-50 group-hover:border-blue-100 transition-colors text-center shadow-sm">
-                            <div className="flex items-center justify-center text-gray-900 font-black">
-                                <span className="text-blue-600 text-[10px] mr-1.5 font-black uppercase">Ksh</span> 
-                                {Number(unit.price).toLocaleString()}
-                            </div>
-                          </td>
-
-                          <td className="px-8 py-6 bg-white border-y border-gray-50 group-hover:border-blue-100 transition-colors text-center shadow-sm">
-                            <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                              unit.isAvailable 
-                              ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-                              : 'bg-rose-50 text-rose-600 border-rose-100'
-                            }`}>
-                              {unit.isAvailable ? "Vacant" : "Occupied"}
-                            </span>
-                          </td>
-
-                          <td className="px-8 py-6 bg-white rounded-r-[2rem] border-y border-r border-gray-50 group-hover:border-blue-100 transition-colors text-right shadow-sm">
-                            <button 
-                                onClick={() => navigate(`${basePath}/units/edit/${unit.id}`)}
-                                className="bg-gray-50 hover:bg-blue-600 hover:text-white text-gray-400 font-black text-[9px] uppercase tracking-widest px-6 py-3 rounded-xl transition-all shadow-sm active:scale-95"
-                            >
-                              {isAdmin ? "Inspect" : "Manage"}
-                            </button>
-                          </td>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-separate border-spacing-y-4">
+                    <thead>
+                        <tr className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">
+                        <th className="px-8 py-2">Unit Identifier</th>
+                        <th className="px-8 py-2 text-center">Monthly Rate</th>
+                        <th className="px-8 py-2 text-center">Status</th>
+                        <th className="px-8 py-2 text-right">Registry</th>
                         </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                        {selectedProperty.units.map((unit: any) => (
+                            <tr key={unit.id} className="group cursor-default">
+                            <td className="px-8 py-6 bg-white rounded-l-[2rem] border-y border-l border-gray-50 group-hover:border-blue-100 transition-all shadow-sm">
+                                <div className="font-black text-gray-900 text-lg tracking-tight uppercase">{unit.unitNumber}</div>
+                                <div className="text-[9px] text-blue-500 font-black uppercase tracking-widest mt-0.5">{unit.size || "Standard Size"}</div>
+                            </td>
+
+                            <td className="px-8 py-6 bg-white border-y border-gray-50 group-hover:border-blue-100 transition-all text-center shadow-sm">
+                                <div className="text-gray-900 font-black text-sm">
+                                    <span className="text-gray-300 text-[10px] mr-1">KES</span> 
+                                    {Number(unit.price).toLocaleString()}
+                                </div>
+                            </td>
+
+                            <td className="px-8 py-6 bg-white border-y border-gray-50 group-hover:border-blue-100 transition-all text-center shadow-sm">
+                                <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                unit.isAvailable 
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
+                                : 'bg-rose-50 text-rose-600 border-rose-100'
+                                }`}>
+                                {unit.isAvailable ? "Vacant" : "Occupied"}
+                                </span>
+                            </td>
+
+                            <td className="px-8 py-6 bg-white rounded-r-[2rem] border-y border-r border-gray-50 group-hover:border-blue-100 transition-all text-right shadow-sm">
+                                <button 
+                                    onClick={() => navigate(`${basePath}/units/edit/${unit.id}`)}
+                                    className="bg-gray-50 hover:bg-gray-900 hover:text-white text-gray-900 font-black text-[9px] uppercase tracking-widest px-6 py-3.5 rounded-xl transition-all active:scale-95 border border-gray-100"
+                                >
+                                {isAdmin ? "Inspect" : "Update"}
+                                </button>
+                            </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                    </table>
+                </div>
               ) : (
-                <div className="py-32 text-center">
-                   <div className="bg-gray-50 w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-6 border border-gray-100">
-                      <HiOutlineCube className="text-gray-200 w-10 h-10" />
+                <div className="py-32 text-center bg-gray-50/50 rounded-[3rem] border-2 border-dashed border-gray-100">
+                   <div className="bg-white w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8 shadow-sm">
+                      <HiOutlineCube className="text-gray-200 w-12 h-12" />
                    </div>
-                  <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">No Inventory</h3>
-                  <p className="text-gray-400 text-sm mt-2 mb-10 max-w-xs mx-auto font-medium">This property does not have any units registered yet.</p>
+                  <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Zero Inventory</h3>
+                  <p className="text-gray-400 text-xs mt-3 mb-10 max-w-xs mx-auto font-bold uppercase tracking-widest leading-relaxed">
+                    This registry entry contains no associated units at this time.
+                  </p>
                   
                   {!isAdmin && (
                     <button 
                       onClick={() => navigate(`/landlord/units/add`, { state: { propertyId: selectedProperty.id } })}
-                      className="bg-gray-900 text-white px-10 py-4 rounded-[1.25rem] font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl shadow-gray-100"
+                      className="bg-gray-900 text-white px-10 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-2xl shadow-gray-200 active:scale-95"
                     >
-                      + Create First Unit
+                      + Create First Unit Record
                     </button>
                   )}
                 </div>

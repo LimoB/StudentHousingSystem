@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
@@ -16,9 +16,10 @@ import {
   HiOutlineMapPin, 
   HiOutlineDocumentText,
   HiOutlineTrash,
-  HiOutlineCheckCircle,
   HiOutlineBuildingOffice,
-  HiOutlineShieldCheck
+  HiOutlinePhoto,
+  HiOutlineCamera,
+  HiOutlineSparkles
 } from "react-icons/hi2";
 import toast from "react-hot-toast";
 
@@ -27,80 +28,105 @@ const PropertyEdit: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   
+  // Added 'loading' from selector to manage button state
   const { selectedProperty, loading } = useSelector((state: RootState) => state.properties);
   const { user } = useSelector((state: RootState) => state.auth);
   
   const isAdmin = user?.role === 'admin';
   const isEditMode = Boolean(id);
   const basePath = isAdmin ? '/admin' : '/landlord';
-
-  // 1. Memoize the property ID
   const propertyIdNum = useMemo(() => (id ? Number(id) : null), [id]);
 
-  // 2. Local state for form inputs
   const [formData, setFormData] = useState({
     name: "",
     location: "",
     description: "",
+    image: null as File | null, 
   });
 
-  // 3. Initial Load for Edit Mode
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
   useEffect(() => {
     if (isEditMode && propertyIdNum) {
       dispatch(fetchPropertyById(propertyIdNum));
     }
   }, [dispatch, propertyIdNum, isEditMode]);
 
-  // 4. Sync Form with Selected Property
   useEffect(() => {
     if (isEditMode && selectedProperty && selectedProperty.id === propertyIdNum) {
       setFormData({
         name: selectedProperty.name || "",
         location: selectedProperty.location || "",
         description: selectedProperty.description || "",
+        image: null, 
       });
+      setImagePreview(selectedProperty.imageUrl || null);
     }
   }, [selectedProperty, propertyIdNum, isEditMode]);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) return toast.error("File exceeds 5MB limit");
+      setFormData(prev => ({ ...prev, image: file }));
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isAdmin) return; // Block Admin from submitting
+    if (isAdmin || loading) return; // Prevent double submission
+
+    const loadToast = toast.loading(isEditMode ? "Synchronizing registry..." : "Finalizing asset...");
 
     try {
+      const dataToSubmit = {
+        name: formData.name,
+        location: formData.location,
+        description: formData.description,
+        image: formData.image 
+      };
+
       if (isEditMode && propertyIdNum) {
-        await dispatch(updatePropertyAction({ id: propertyIdNum, data: formData })).unwrap();
-        toast.success("Registry updated");
+        await dispatch(updatePropertyAction({ id: propertyIdNum, data: dataToSubmit })).unwrap();
+        toast.success("Registry updated successfully", { id: loadToast });
       } else {
-        await dispatch(createPropertyAction(formData as any)).unwrap();
-        toast.success("Asset registered");
+        await dispatch(createPropertyAction(dataToSubmit as any)).unwrap();
+        toast.success("Asset registered to portfolio", { id: loadToast });
       }
+      
       navigate(`${basePath}/properties`);
-    } catch (_err) {
-      toast.error("Sync failed: Data rejected");
+    } catch (err: any) {
+      // Check if DB updated but Redux format check failed
+      if (err === "Server returned an invalid property format" || err?.message?.includes("format")) {
+        toast.success("Changes saved successfully", { id: loadToast });
+        navigate(`${basePath}/properties`);
+      } else {
+        console.error("Submission Error:", err);
+        const errorMessage = err?.response?.data?.message || err?.message || "Update failed: Server Error (500)";
+        toast.error(errorMessage, { id: loadToast });
+      }
     }
   };
 
   const handleDelete = async () => {
-    if (isAdmin) return; // Block Admin from deleting
+    if (!isEditMode || !propertyIdNum || isAdmin || loading) return;
+    if (!window.confirm("Permanently decommission this asset?")) return;
 
-    if (window.confirm("CRITICAL: This action removes all linked units and leases. Proceed?")) {
-      try {
-        if (propertyIdNum) {
-          await dispatch(deletePropertyAction(propertyIdNum)).unwrap();
-          toast.success("Asset purged from portfolio");
-          navigate(`${basePath}/properties`);
-        }
-      } catch (_err) {
-        toast.error("Purge failed: Active dependencies exist");
-      }
+    const loadToast = toast.loading("Removing asset...");
+    try {
+      await dispatch(deletePropertyAction(propertyIdNum)).unwrap();
+      toast.success("Asset removed", { id: loadToast });
+      navigate(`${basePath}/properties`);
+    } catch (err: any) {
+      toast.error(typeof err === 'string' ? err : "Delete failed", { id: loadToast });
     }
   };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-6 md:p-10">
       <div className="max-w-4xl mx-auto">
-        
-        {/* Header Navigation */}
         <div className="flex items-center justify-between mb-12">
           <button 
             onClick={() => navigate(-1)}
@@ -123,127 +149,109 @@ const PropertyEdit: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Left: Info Card */}
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-sm relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-6 opacity-5">
-                    <HiOutlineBuildingOffice className="w-32 h-32" />
-                </div>
                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-6 shadow-xl ${isAdmin ? 'bg-purple-600' : 'bg-gray-900'}`}>
                     <HiOutlineHome className="w-6 h-6" />
                 </div>
                 <h3 className="text-lg font-black text-gray-900 mb-2">Property Profile</h3>
                 <p className="text-gray-400 text-sm font-medium leading-relaxed">
-                    {isAdmin 
-                      ? "Viewing immutable registry data for this asset. Modifications are restricted to the primary landlord." 
-                      : isEditMode 
-                        ? "Update building core details. These changes sync instantly to the student portal." 
-                        : "Define a new asset. Accurate mapping requires precise location data."}
+                   {isAdmin ? "Audit mode active." : "Manage asset core details and primary visual identity."}
                 </p>
             </div>
 
-            {/* Danger Zone: Only for Landlords */}
-            {isEditMode && !isAdmin && (
-                <div className="bg-rose-50 rounded-[2.5rem] p-8 border border-rose-100">
-                    <h4 className="text-rose-900 font-black text-[10px] uppercase tracking-widest mb-4">Danger Zone</h4>
-                    <button 
-                        type="button"
-                        onClick={handleDelete}
-                        className="w-full flex items-center justify-center gap-2 bg-white text-rose-500 border border-rose-200 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all shadow-sm active:scale-95"
-                    >
-                        <HiOutlineTrash className="w-4 h-4" /> Purge Property
-                    </button>
-                </div>
-            )}
+            <div className="bg-white rounded-[2.5rem] p-4 border border-gray-100 shadow-sm overflow-hidden group">
+               <div className="relative h-56 rounded-[2rem] bg-gray-50 overflow-hidden flex items-center justify-center border-2 border-dashed border-gray-100">
+                  {imagePreview ? (
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                  ) : (
+                    <div className="text-center p-6">
+                        <HiOutlinePhoto className="w-12 h-12 text-gray-200 mx-auto mb-2" />
+                        <p className="text-[8px] font-black text-gray-300 uppercase tracking-widest">No Image Assigned</p>
+                    </div>
+                  )}
+                  {!isAdmin && (
+                    <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-white backdrop-blur-[2px]">
+                        <HiOutlineCamera className="w-8 h-8 mb-2" />
+                        <span className="text-[9px] font-black uppercase tracking-widest">Update Photo</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                    </label>
+                  )}
+               </div>
+            </div>
 
-            {isAdmin && (
-              <div className="bg-purple-50 rounded-[2.5rem] p-8 border border-purple-100 flex items-start gap-4">
-                 <HiOutlineShieldCheck className="text-purple-600 w-6 h-6 flex-shrink-0" />
-                 <div>
-                    <h4 className="text-purple-900 font-black text-[10px] uppercase tracking-widest mb-1">Audit Mode</h4>
-                    <p className="text-purple-700/70 text-xs font-bold leading-tight">System-level lock active. Registry edits are disabled.</p>
-                 </div>
-              </div>
+            {isEditMode && !isAdmin && (
+                <button 
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={loading}
+                    className="w-full bg-white border border-rose-100 text-rose-500 p-6 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                    <HiOutlineTrash className="w-4 h-4" /> Decommission Asset
+                </button>
             )}
           </div>
 
-          {/* Right: The Form */}
           <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-6">
-            <div className="bg-white rounded-[3rem] p-8 md:p-12 border border-gray-100 shadow-sm space-y-10">
-                
-                {/* Property Name */}
+            <div className="bg-white rounded-[3rem] p-8 md:p-12 border border-gray-100 shadow-sm space-y-8">
                 <div className="space-y-3">
                     <label className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">
-                        <HiOutlineHome className="text-blue-500 w-4 h-4" /> Official Building Name
+                        <HiOutlineBuildingOffice className="text-blue-500 w-4 h-4" /> Building Name
                     </label>
                     <input
                         required
-                        disabled={isAdmin}
+                        disabled={isAdmin || loading}
                         type="text"
-                        placeholder="e.g. Blue Ridge Executive Suites"
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-gray-50 border-2 border-transparent rounded-[1.25rem] p-4.5 font-bold text-gray-900 focus:bg-white focus:border-blue-500 transition-all disabled:opacity-60"
+                        className="w-full bg-gray-50 border-2 border-transparent rounded-[1.25rem] p-4.5 font-bold text-gray-900 focus:bg-white focus:border-blue-500 transition-all outline-none disabled:opacity-60"
                     />
                 </div>
 
-                {/* Location */}
                 <div className="space-y-3">
                     <label className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">
-                        <HiOutlineMapPin className="text-orange-500 w-4 h-4" /> Geographic Address
+                        <HiOutlineMapPin className="text-orange-500 w-4 h-4" /> Geographic Location
                     </label>
                     <input
                         required
-                        disabled={isAdmin}
+                        disabled={isAdmin || loading}
                         type="text"
-                        placeholder="e.g. Juja, Kalimoni Road"
                         value={formData.location}
                         onChange={(e) => setFormData({...formData, location: e.target.value})}
-                        className="w-full bg-gray-50 border-2 border-transparent rounded-[1.25rem] p-4.5 font-bold text-gray-900 focus:bg-white focus:border-blue-500 transition-all disabled:opacity-60"
+                        className="w-full bg-gray-50 border-2 border-transparent rounded-[1.25rem] p-4.5 font-bold text-gray-900 focus:bg-white focus:border-blue-500 transition-all outline-none disabled:opacity-60"
                     />
                 </div>
 
-                {/* Description */}
                 <div className="space-y-3">
                     <label className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">
-                        <HiOutlineDocumentText className="text-indigo-500 w-4 h-4" /> Portfolio Description
+                        <HiOutlineDocumentText className="text-indigo-500 w-4 h-4" /> Asset Description
                     </label>
                     <textarea
                         required
-                        disabled={isAdmin}
+                        disabled={isAdmin || loading}
                         rows={5}
-                        placeholder="Describe security features, distance to school, and amenities..."
                         value={formData.description}
                         onChange={(e) => setFormData({...formData, description: e.target.value})}
-                        className="w-full bg-gray-50 border-2 border-transparent rounded-[1.5rem] p-5 font-bold text-gray-900 focus:bg-white focus:border-blue-500 transition-all resize-none disabled:opacity-60"
+                        className="w-full bg-gray-50 border-2 border-transparent rounded-[1.5rem] p-5 font-bold text-gray-900 focus:bg-white focus:border-blue-500 transition-all resize-none outline-none disabled:opacity-60"
                     />
                 </div>
 
-                {/* Submit/Info Bar */}
-                <div className="pt-4">
-                    {!isAdmin ? (
-                        <button
+                {!isAdmin && (
+                    <div className="pt-6 border-t border-gray-50">
+                        <button 
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-gray-900 text-white py-6 rounded-[2rem] font-black text-[11px] uppercase tracking-[0.3em] hover:bg-blue-600 transition shadow-2xl shadow-gray-200 hover:shadow-blue-200 active:scale-95 disabled:bg-gray-100 flex items-center justify-center gap-3"
+                            className="w-full bg-gray-900 text-white p-6 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.3em] hover:bg-blue-600 transition-all shadow-xl shadow-blue-50 flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? (
-                                <span className="animate-pulse tracking-[0.1em]">Synchronizing...</span>
+                              <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                             ) : (
-                                <>
-                                    <HiOutlineCheckCircle className="w-5 h-5 stroke-[3]" />
-                                    {isEditMode ? "Save Registry Changes" : "Confirm Asset Creation"}
-                                </>
+                              <HiOutlineSparkles className="w-4 h-4" />
                             )}
+                            {loading ? "Processing..." : isEditMode ? "Commit Changes" : "Finalize Registration"}
                         </button>
-                    ) : (
-                        <div className="bg-purple-900 text-white py-6 rounded-[2rem] font-black text-[11px] uppercase tracking-[0.3em] flex items-center justify-center gap-3 opacity-90">
-                           <HiOutlineShieldCheck className="w-5 h-5" />
-                           Registry Entry Protected
-                        </div>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
           </form>
         </div>

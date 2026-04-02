@@ -35,6 +35,7 @@ app.use(
 // =========================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 // app.use(logger);
 
 // =========================
@@ -57,8 +58,11 @@ app.use("/api/auth", authRouter);
 app.use("/api/users", authMiddleware, userRouter);
 app.use("/api/properties", authMiddleware, propertyRouter);
 app.use("/api/units", authMiddleware, unitRouter);
-app.use("/api", bookingRouter);// authMiddleware,
-app.use("/api/payments", paymentRouter);// authMiddleware,
+
+// Booking and Payments routes remain as configured
+app.use("/api", bookingRouter); // authMiddleware,
+app.use("/api/payments", paymentRouter); // authMiddleware,
+
 app.use("/api/leases", authMiddleware, leaseRouter);
 app.use("/api/maintenance", authMiddleware, maintenanceRouter);
 app.use("/api/notifications", authMiddleware, notificationRouter);
